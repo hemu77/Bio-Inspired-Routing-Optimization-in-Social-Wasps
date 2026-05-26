@@ -89,23 +89,38 @@ The executed final notebook and the standalone script both reproduce the same ov
 
 `TSP` wins all 36 nest-bout scenarios under the fair comparison. The important result is not just that it finishes first; it also uses far less movement and leaves larvae with the lowest final hunger. `Greedy` is a credible second-place method after target-crowding control, but local priority still cannot match route-level organization. `Biased` and `random` complete eventually, but they spend too much motion wandering.
 
-## Four Strategy Simulation Plots
+## Playable Four-Strategy Simulations
 
-The repository now includes four fixed simulation plots for the same large `v87` scenario. These are final-state snapshots, not separate cherry-picked runs: every strategy receives the same colony, wasp count, grid size, and scenario seed.
+The repository includes playable simulation exports for the same large `v87` scenario. Every strategy receives the same colony, wasp count, grid size, and scenario seed, so the movement differences come from the routing strategy itself.
 
-![Four strategy simulation final states](figures/simulation_all_strategies.png)
+### Playable GIFs
 
-Individual strategy snapshots:
+These render directly in GitHub:
 
 | TSP | Greedy |
 | --- | --- |
-| ![TSP simulation final state](figures/simulation_tsp.png) | ![Greedy simulation final state](figures/simulation_greedy.png) |
+| ![TSP playable simulation](animations/simulation_tsp.gif) | ![Greedy playable simulation](animations/simulation_greedy.gif) |
 
 | Biased | Random |
 | --- | --- |
-| ![Biased simulation final state](figures/simulation_biased.png) | ![Random simulation final state](figures/simulation_random.png) |
+| ![Biased playable simulation](animations/simulation_biased.gif) | ![Random playable simulation](animations/simulation_random.gif) |
 
-The point of these plots is visual accountability. The summary tables prove the benchmark result numerically, while these plots show that the simulation is actually placing larvae, wasps, blocked nest cells, and final feeding states in a biologically interpretable nest-like layout.
+### HTML Animations With Controls
+
+The same animations are also exported as standalone Matplotlib HTML files:
+
+- [`animations/simulation_tsp.html`](animations/simulation_tsp.html)
+- [`animations/simulation_greedy.html`](animations/simulation_greedy.html)
+- [`animations/simulation_biased.html`](animations/simulation_biased.html)
+- [`animations/simulation_random.html`](animations/simulation_random.html)
+
+GitHub does not execute notebook JavaScript the same way a local Jupyter session does, so the GIFs are included for direct README playback and the HTML files are included for local/browser playback with controls.
+
+### Final-State Snapshot Summary
+
+![Four strategy simulation final states](figures/simulation_all_strategies.png)
+
+The point of these visual exports is accountability. The summary tables prove the benchmark result numerically, while the animations show that the simulation is actually placing larvae, wasps, blocked nest cells, and final feeding states in a biologically interpretable nest-like layout.
 
 ## Analysis Figures
 
@@ -127,6 +142,8 @@ Plots that only repeated "everything completed" or only visualized configuration
 | `final_analysis.ipynb` | Main executed research notebook with tables, plots, selected animations, validation, and interpretation. |
 | `wasp_routing_analysis.py` | Script version of the benchmark pipeline for reproducible command-line runs. |
 | `figures/` | Exported four-strategy simulation plots used by the README. |
+| `animations/` | Playable GIF and standalone HTML animations for the four movement strategies. |
+| `generate_strategy_animations.py` | Script that regenerates the GIF/HTML animation assets from local CSV data. |
 | `requirements.txt` | Python dependencies needed to run the notebook/script. |
 | `.gitignore` | Prevents local datasets and generated outputs from being committed. |
 
@@ -160,7 +177,13 @@ python -m pip install -r requirements.txt
 python wasp_routing_analysis.py --output-dir outputs
 ```
 
-5. Or open the notebook.
+5. Regenerate playable strategy animations if needed.
+
+```bash
+python generate_strategy_animations.py --output-dir animations
+```
+
+6. Or open the notebook.
 
 ```bash
 jupyter lab final_analysis.ipynb

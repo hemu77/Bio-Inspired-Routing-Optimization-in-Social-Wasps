@@ -7,3 +7,4 @@ jupyterlab>=4.0
 nbclient>=0.10
 nbformat>=5.10
 ipykernel>=6.25
+Pillow>=10.0
