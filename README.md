@@ -89,6 +89,24 @@ The executed final notebook and the standalone script both reproduce the same ov
 
 `TSP` wins all 36 nest-bout scenarios under the fair comparison. The important result is not just that it finishes first; it also uses far less movement and leaves larvae with the lowest final hunger. `Greedy` is a credible second-place method after target-crowding control, but local priority still cannot match route-level organization. `Biased` and `random` complete eventually, but they spend too much motion wandering.
 
+## Four Strategy Simulation Plots
+
+The repository now includes four fixed simulation plots for the same large `v87` scenario. These are final-state snapshots, not separate cherry-picked runs: every strategy receives the same colony, wasp count, grid size, and scenario seed.
+
+![Four strategy simulation final states](figures/simulation_all_strategies.png)
+
+Individual strategy snapshots:
+
+| TSP | Greedy |
+| --- | --- |
+| ![TSP simulation final state](figures/simulation_tsp.png) | ![Greedy simulation final state](figures/simulation_greedy.png) |
+
+| Biased | Random |
+| --- | --- |
+| ![Biased simulation final state](figures/simulation_biased.png) | ![Random simulation final state](figures/simulation_random.png) |
+
+The point of these plots is visual accountability. The summary tables prove the benchmark result numerically, while these plots show that the simulation is actually placing larvae, wasps, blocked nest cells, and final feeding states in a biologically interpretable nest-like layout.
+
 ## Analysis Figures
 
 The final notebook keeps only plots that support specific claims:
@@ -108,6 +126,7 @@ Plots that only repeated "everything completed" or only visualized configuration
 | --- | --- |
 | `final_analysis.ipynb` | Main executed research notebook with tables, plots, selected animations, validation, and interpretation. |
 | `wasp_routing_analysis.py` | Script version of the benchmark pipeline for reproducible command-line runs. |
+| `figures/` | Exported four-strategy simulation plots used by the README. |
 | `requirements.txt` | Python dependencies needed to run the notebook/script. |
 | `.gitignore` | Prevents local datasets and generated outputs from being committed. |
 

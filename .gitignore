@@ -6,6 +6,10 @@ outputs/
 tmp_*/
 .ipynb_checkpoints/
 
+# Keep generated presentation figures that are intentionally exported.
+!figures/
+!figures/*.png
+
 # Python cache/build artifacts.
 __pycache__/
 *.py[cod]
