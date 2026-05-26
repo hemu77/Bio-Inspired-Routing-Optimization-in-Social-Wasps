@@ -1,0 +1,22 @@
+# Local data files are intentionally excluded from the public repo.
+*.csv
+
+# Generated outputs and notebook scratch state.
+outputs/
+tmp_*/
+.ipynb_checkpoints/
+
+# Python cache/build artifacts.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Local environments.
+.venv/
+venv/
+env/
