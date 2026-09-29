@@ -3,6 +3,8 @@
 
 **[Open the interactive lab](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/) | [Executed research notebook](final_analysis_v2.ipynb) | [Verification gates](docs/ACCEPTANCE.md)**
 
+![Verification status](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/actions/workflows/verify-publish.yml/badge.svg)
+
 An agent-based project asking how movement, local information and worker coordination change the effort needed to serve a colony. Three observed nest layouts support 36 synthetic nest-bout scenarios. Six policies, ten paired replicates and two controlled ablations produce **2,880 simulations**. A layered 3D workstation makes recorded decisions inspectable, rather than merely animated.
 
 > Research-v2 measures **first-feed coverage**, not satiation. Random initial hunger is an assumed priority, not measured physiology. Depth is illustrative; XY comes from the mapped simulation.

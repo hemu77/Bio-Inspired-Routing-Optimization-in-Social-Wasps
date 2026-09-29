@@ -10,7 +10,7 @@ Checkboxes become checked only after evidence is recorded. RED means failing or 
 | Single-run ranking | No stochastic stability check | Ten paired replicates, all 36 scenarios, separately reported ablations | RED -> GREEN 2160 fair + 720 ablation runs |
 | Composite difficulty and four-point frontier | Unjustified weights and redundant evidence | Six explicit research questions, censoring and conditional uncertainty | RED -> GREEN six inspected, executed PNGs |
 | GIF-only simulation | No inspection or interactive layers | Actual-tick Python replays, layer-first 3D and 2D fallback | RED -> GREEN six local browser tests |
-| No public regression checks | Private data needed to test | Public synthetic tests and CI; datasets stay private | RED -> GREEN nine local tests; hosted CI pending |
+| No public regression checks | Private data needed to test | Public synthetic tests and CI; datasets stay private | RED -> GREEN nine unit tests, six browser tests, hosted CI |
 
 ## Checklist
 - [x] Legacy benchmark reproduced: 144 runs; NN-tour median 67, greedy 142.5, persistent 463.5, random 529.
@@ -21,7 +21,21 @@ Checkboxes become checked only after evidence is recorded. RED means failing or 
 - [x] Notebook executed: 43 cells, six embedded PNGs, 12 HTML outputs, no errors.
 - [x] All four original strategies playable on one actual clock.
 - [x] Pin / hidden-layer / picking / camera / mobile / fallback verified.
-- [ ] Publication excludes datasets and preserves legacy reference and PDF.
+- [x] Remote tree contains zero CSV files; legacy tag, old notebook, animations and PDF preserved.
+- [x] Hosted CI and Pages deployment passed: [verification run](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/actions/runs/36641827666).
+- [x] Live v87-S06 comparison inspected: all four methods end at 134/134 served.
+
+![Verified live comparison](live-comparison.jpg)
+
+## Visual Evidence
+- Desktop checked at 1440 x 960; mobile checked at 390 x 844.
+- Compared concept and implementation: warm rails/charcoal viewport, six-layer left rail, central nest framing, right inspector, bottom actual-tick timeline.
+- Fixed mobile cropping, delayed canvas screenshots and notebook theme contamination.
+- Square mapped cells intentionally replace the concept's invented hexagonal geometry.
+- No invented biological quantities or inferred 3D observations appear in the inspector.
+- Five unaffected figure designs and the revised coverage/reliability layouts were inspected; six final report figures are retained.
+- Live playback and seek show post-tick states and hold finished methods at their actual completion tick.
+- Remaining scope limits: no physiological calibration; total browser process memory not certified; GitHub Actions reports non-blocking Node-runtime migration annotations.
 
 Local playback sample: 24 renders/s, 25 MiB JS heap (not total browser memory).
 Observed full-run Python RSS: 328 MiB. Dependencies: npm audit zero vulnerabilities.
