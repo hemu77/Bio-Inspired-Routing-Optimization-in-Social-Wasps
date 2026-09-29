@@ -33,7 +33,7 @@ Checkboxes become checked only after evidence is recorded. RED means failing or 
 - Fixed mobile cropping, delayed canvas screenshots and notebook theme contamination.
 - Square mapped cells intentionally replace the concept's invented hexagonal geometry.
 - No invented biological quantities or inferred 3D observations appear in the inspector.
-- Five unaffected figure designs and the revised coverage/reliability layouts were inspected; six final report figures are retained.
+- All six retained figures were inspected; coverage/reliability layouts were revised after the first inspection.
 - Live playback and seek show post-tick states and hold finished methods at their actual completion tick.
 - Remaining scope limits: no physiological calibration; total browser process memory not certified; GitHub Actions reports non-blocking Node-runtime migration annotations.
 
