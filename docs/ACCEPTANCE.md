@@ -1,0 +1,41 @@
+# Upgrade Gates
+
+Checkboxes become checked only after evidence is recorded. RED means failing or unverified; GREEN means tested, not a guarantee of biological truth.
+
+| What existed | What was wrong | Improvement / distinct contribution | Test gate |
+|---|---|---|---|
+| Four policies, one seed | Movement budget and sensing differ | Cardinal move OR first feed OR broadcast; information classes disclosed | RED -> GREEN synthetic action/RNG tests |
+| Hunger grew and three feeds implied satiation | No physiological calibration | Keep stage-random initial hunger; measure first-feed coverage only | RED -> GREEN immutable priority / feed-once tests |
+| Notebook duplicated simulation classes | Results could drift between exports | One research engine for benchmark, notebook and replay | RED -> GREEN replay repeatability |
+| Single-run ranking | No stochastic stability check | Ten paired replicates, all 36 scenarios, separately reported ablations | RED -> GREEN 2160 fair + 720 ablation runs |
+| Composite difficulty and four-point frontier | Unjustified weights and redundant evidence | Six explicit research questions, censoring and conditional uncertainty | RED -> GREEN six inspected, executed PNGs |
+| GIF-only simulation | No inspection or interactive layers | Actual-tick Python replays, layer-first 3D and 2D fallback | RED -> GREEN six local browser tests |
+| No public regression checks | Private data needed to test | Public synthetic tests and CI; datasets stay private | RED -> GREEN nine local tests; hosted CI pending |
+
+## Checklist
+- [x] Legacy benchmark reproduced: 144 runs; NN-tour median 67, greedy 142.5, persistent 463.5, random 529.
+- [x] Nine synthetic checks pass, including broadcast cost, scheduler separation and frequency independence.
+- [x] 18-run smoke: 4.0 seconds, peak measured Python RSS 217.4 MiB.
+- [x] 2160 fair runs + 720 ablation runs executed and validated; final pass 471.1 seconds.
+- [x] Six report figures visually inspected; captions match saved results.
+- [x] Notebook executed: 43 cells, six embedded PNGs, 12 HTML outputs, no errors.
+- [x] All four original strategies playable on one actual clock.
+- [x] Pin / hidden-layer / picking / camera / mobile / fallback verified.
+- [ ] Publication excludes datasets and preserves legacy reference and PDF.
+
+Local playback sample: 24 renders/s, 25 MiB JS heap (not total browser memory).
+Observed full-run Python RSS: 328 MiB. Dependencies: npm audit zero vulnerabilities.
+Source digest includes normalized engine, experiment runner and legacy-helper code;
+checkpoint fingerprint also includes derived geometry and scenario configuration.
+
+## Viewer Design Contract
+Warm off-white rails, charcoal viewport, amber workers and teal served larvae.
+Left: six layers. Center: mapped square cells and low-poly segmented workers.
+Right: pinned entity inspector. Bottom: actual-tick playback, seek and speed.
+Nest depth is illustrative; XY coordinates are exactly simulation coordinates.
+Stage controls body size; priority controls waiting color; served state also changes shape.
+No 3D biology is inferred from planar observations. Hidden layers are not pickable;
+pinned hidden entities remain identified. Orbit drags must never become clicks.
+Comparison uses one renderer with scissor views, not four WebGL contexts.
+The concept's hexagonal geometry and invented inspector fields are intentionally
+not implemented: the scientific coordinate/action contract takes precedence.

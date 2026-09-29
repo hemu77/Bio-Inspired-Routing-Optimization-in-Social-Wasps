@@ -1,229 +1,171 @@
-# Bio-Inspired Routing Optimization in Social Wasps
+# Nest / Routing Lab
+### Bio-Inspired Routing Optimization in Social Wasps
 
-This project turns observed social-wasp nest and feeding-bout data into an agent-based routing benchmark. The core question is simple: if larvae are fixed across a nest and adult wasps must move through space to feed them, which movement rule feeds the colony fastest and with the least wasted travel? The final report notebook, `final_analysis.ipynb`, evaluates this question across every available nest and bout: 3 nests, 36 nest-bout scenarios, and 144 fair strategy simulations.
+**[Open the interactive lab](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/) | [Executed research notebook](final_analysis_v2.ipynb) | [Verification gates](docs/ACCEPTANCE.md)**
+
+An agent-based project asking how movement, local information and worker coordination change the effort needed to serve a colony. Three observed nest layouts support 36 synthetic nest-bout scenarios. Six policies, ten paired replicates and two controlled ablations produce **2,880 simulations**. A layered 3D workstation makes recorded decisions inspectable, rather than merely animated.
+
+> Research-v2 measures **first-feed coverage**, not satiation. Random initial hunger is an assumed priority, not measured physiology. Depth is illustrative; XY comes from the mapped simulation.
+
+![Layer-first replay workstation](docs/lab-preview.png)
 
 ## Why This Project Matters
 
-Larval feeding is both a biological care problem and a routing problem. Larvae differ by developmental stage, their hunger changes through time, and adult wasps must repeatedly choose where to move next. That makes the system a strong test bed for bio-inspired optimization: the model is grounded in real nest geometry, but the strategies can be compared under controlled simulation conditions.
+Distributed groups can finish shared tasks without a central dispatcher. Wasp feeding makes that idea concrete: many workers must find many larvae, and reaching nearby targets is not the same as covering the whole nest efficiently. The engineering analogy includes inspection, service routing and multi-agent allocation. This project does **not** establish that real wasps use these algorithms.
 
-The project is unique because it does not only animate one hand-picked example. It converts every observed nest-bout combination into a fair benchmark scenario, scales colony structure reproducibly, assigns hunger from biologically interpretable stage ranges, and then compares structured route planning against weaker local or random movement rules.
+## Research Question And Goal
 
-## Research Question
+**With matched starting conditions and action budgets, what trade-offs appear between whole-colony coverage, movement, waiting and communication?**
 
-How do different wasp movement strategies perform when they are asked to feed the same synthetic larval colony under the same resources, grid size, and random seed?
-
-The benchmark separates the observed data from the simulated decision rule:
-
-- Observed data defines nest geometry, bout identity, activity level, spatial breadth, and observed worker count.
-- Simulated hunger is assigned randomly by larval stage, not copied from feeding frequency.
-- Strategy performance is measured by completion time, total movement, movement efficiency, and final average hunger.
+Success means every synthetic larva receives its first feed. Runs stop at success or 3,000 ticks. Incomplete main runs receive a separate 10,000-tick pass, never mixed into the fair ranking. All 2,160 executed main runs finished, so no extended pass was needed.
 
 ## Dataset Description
 
-The analysis expects two local CSV files:
+Two private files are needed only to regenerate experiments:
 
-| File | Role |
-| --- | --- |
-| `ED_FL_3nests1noC2.csv` | Nest-cell map with nest ID, cell coordinates, cell contents, developmental stage, and distance from center. |
-| `ALL_FL_minmaj_final3noC2.csv` | Behavioral bout observations with nest ID, bout ID, behavior code, cell reference, and wasp ID. |
+| Local file | Contribution | Does not establish |
+|---|---|---|
+| `ED_FL_3nests1noC2.csv` | Cell coordinates, contents and stages | True initial hunger or 3D structure |
+| `ALL_FL_minmaj_final3noC2.csv` | Nest/bout groups, worker counts and activity summaries | Validation of simulated trajectories |
 
-Datasets are intentionally not committed to this repository. Keep them locally in the project root when running the notebook or script.
+| Nest | Bouts | Original larvae | Synthetic larvae | Grid width |
+|---|---:|---:|---:|---:|
+| v14 | 10 | 34 | 68 | 22 |
+| v72 | 14 | 53 | 106 | 25 |
+| v87 | 12 | 67 | 134 | 28 |
+
+The inherited event grouping (`FL`, `FL2`, `LPL`, `SPL`) is an **assumed activity proxy** for resource scaling until a behavioral codebook is confirmed. Public scenarios use ordinal labels such as `v87-S06`; original bout labels and worker identities are not exported. Derived summaries and selected synthetic traces are public. **Raw CSV datasets are not published.**
 
 ## Modeling Approach
 
-The model uses Mesa to simulate a nest as a 2D grid. Larvae are stationary agents placed from the nest-cell coordinates. Wasps are mobile agents that move one grid step at a time and attempt to feed larvae when they arrive at an occupied larval cell.
+An agent-based model tracks individual larvae and workers. Larvae remain in cells; workers move on a bounded square grid. All workers can feed. Food availability, role specialization and foraging trips are outside this experiment. Background cells remain traversable.
 
-The final benchmark includes:
+One activation permits one cardinal move, one first feed at the current cell, **or** one claim broadcast. Feeding and broadcasting replace movement; neither is free. Initialization, scheduling and policy choices use independent random streams. Policies inside a scenario-replicate receive the same colony, resources, grid and scheduler seed. Extra policy random draws cannot change activation order.
 
-| Nest | Base larvae | Scaled larvae | Bouts |
-| --- | ---: | ---: | ---: |
-| `v14` | 34 | 68 | 10 |
-| `v72` | 53 | 106 | 14 |
-| `v87` | 67 | 134 | 12 |
+Unfinished runs have `completion_step: null` and `stop_reason: "horizon"`. Horizon-capped time includes failures at 3,000; travel is measured in cardinal grid units, not metabolic energy. Restricted waiting ends at first feed or the censoring horizon.
 
-Each nest is scaled by duplicating the larval map once with deterministic coordinate jitter. This preserves the original spatial layout while creating a larger synthetic colony for stress-testing routing strategies.
+## Agent Behavior And Strategies
 
-## Agent Behavior and Strategies
+| Identifier | Information | Actual rule |
+|---|---|---|
+| `random` | Blind | Independent cardinal random walk |
+| `biased` | Blind | Persistent direction; 25% chance to redraw |
+| `greedy` | Global | Stochastic target weighted by initial priority / (1 + Manhattan distance) |
+| `tsp` | Global | Nearest-neighbour tour; historical name, **not an optimal TSP solver** |
+| `local_nearest` | Local | Nearest observed or remembered target; explore otherwise |
+| `local_urgency_claims` | Local | Observed priority / (1 + distance), with expiring local claims |
 
-Four strategies are compared in every nest-bout scenario:
+Local sensing and communication use Manhattan radius 3. Bounded memory stores at most 256 observed locations, served states and priorities. Workers explore least-visited neighbors when no target is known. Claims expire after 8 ticks, with renewal considered every 4; lower worker IDs resolve received conflicts.
 
-| Strategy | Meaning |
-| --- | --- |
-| `random` | Pure wandering baseline. Useful as a lower-bound control. |
-| `biased` | Directionally persistent movement. Less chaotic than random, but still weakly informed. |
-| `greedy` | Local priority rule that targets hungry, nearby, high-stage larvae while avoiding excessive target crowding. |
-| `tsp` | Nearest-neighbor route-style benchmark that repeatedly builds a route over remaining unfed larvae. |
+Two urgency ablations disable claims or enable global sensing. Local nearest versus urgency without claims additionally exposes priority selection. Information classes differ: a comparison across classes cannot isolate routing alone.
 
-The `tsp` strategy is not a claim that real wasps solve the traveling-salesperson problem. It is used as a structured routing benchmark so the project can measure how valuable route organization is compared with local or random search.
+## Synthetic Scaling And Hunger
 
-## Synthetic Colony Scaling and Hunger Initialization
+`SCALE_FACTOR=2` duplicates each original larva once with deterministic coordinate jitter and collision-resolved grid placement. Added larvae are synthetic; quantized grid locations are not raw physical coordinates.
 
-The simulation keeps the ground rules fixed:
+| Stage | Uniform initial priority |
+|---|---|
+| L1 (i1/i2) | [0.20, 0.50] |
+| L2 (i3/i4) | [0.45, 0.75] |
+| L3 (i5) | [0.65, 1.00] |
 
-- `SCALE_FACTOR = 2`
-- `RANDOM_SEED = 42`
-- fair benchmark horizon: `3000` steps
-- wasps per scenario: `max(ceil(scaled_larvae / 5), observed_unique_wasps) + activity_bonus`
-- activity bonus: `ceil(observed_feeding_events / 100)`
+Initial hunger stays fixed. `FL_freq` never drives it; a regression test changes frequency values and checks identical initialization. Seed 42 anchors deterministic derived seeds; ten replicates vary assumptions in paired experiments.
 
-Initial hunger is generated from larval stage, not from `FL_freq`:
+The retained staffing rule is `max(ceil(larvae/5), observed workers) + ceil(grouped activity events/100)`. This is an engineering workload assumption, not a calibrated biological staffing law.
 
-| Stage | Initial hunger range |
-| --- | --- |
-| `L1` | `0.20` to `0.50` |
-| `L2` | `0.45` to `0.75` |
-| `L3` | `0.65` to `1.00` |
+## Key Results And Interpretation
 
-This avoids circular logic: observed feeding frequency remains available as metadata, but it does not directly determine how hungry simulated larvae are.
+Ranking sorts reliability first, then median horizon-capped time, then median movement per served larva. Each policy has 360 fair runs.
 
-## Key Results
+| Policy | Completed | Median ticks | Median travel / served | Median priority-weighted wait |
+|---|---:|---:|---:|---:|
+| Local nearest | 100% | 57 | 11.55 | 21.29 |
+| Local urgency + claims | 100% | 67 | 10.39 | 25.11 |
+| Global NN tour | 100% | 133 | 28.25 | 60.96 |
+| Global weighted choice | 100% | 190 | 40.01 | 90.74 |
+| Persistent walk | 100% | 268 | 46.62 | 48.60 |
+| Random walk | 100% | 367.5 | 77.66 | 78.72 |
 
-The executed final notebook and the standalone script both reproduce the same overall ranking:
+**No unconditional coordination win:** local nearest is faster. Urgency with claims travels less but waits longer; its median time is 67 versus 60 without claims. Charging communication an action exposes that trade-off. These are conditional simulation results, not biological population claims or proof of an optimal algorithm.
 
-| Strategy | Runs | Finish rate | Median completion step | Median distance | Median final hunger | Median efficiency |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `tsp` | 36 | 1.00 | 67.0 | 2345.0 | 0.017 | 45.1 |
-| `greedy` | 36 | 1.00 | 142.5 | 6137.0 | 0.118 | 17.3 |
-| `biased` | 36 | 1.00 | 463.5 | 8353.5 | 0.286 | 12.5 |
-| `random` | 36 | 1.00 | 529.0 | 11642.5 | 0.209 | 8.8 |
+Six figures answer explicit questions: coverage dynamics, reliability/capped time, travel per served larva, restricted waiting, all-scenario robustness and coordination-cost ablations. Replicate envelopes are conditional stochastic variability, **not biological confidence intervals**. Unsupported composite difficulty and redundant four-point frontiers were removed from v2.
 
-`TSP` wins all 36 nest-bout scenarios under the fair comparison. The important result is not just that it finishes first; it also uses far less movement and leaves larvae with the lowest final hunger. `Greedy` is a credible second-place method after target-crowding control, but local priority still cannot match route-level organization. `Biased` and `random` complete eventually, but they spend too much motion wandering.
+![All-scenario comparison](figures/research-v2/05_scenarios.png)
 
-## Playable Four-Strategy Simulations
+## Why This Is Distinctive
 
-The repository includes playable simulation exports for the same large `v87` scenario. Every strategy receives the same colony, wasp count, grid size, and scenario seed, so the movement differences come from the routing strategy itself.
+The contribution is an **auditable experiment-to-replay workflow**, not decorative 3D. Every visible feed, target, claim and decision reason comes from the benchmark's Python engine. Paired scheduler streams, local observations, message cost, timeout handling and negative ablation findings make assumptions inspectable. The reader can question what an agent could know, not just watch motion.
 
-### Playable GIFs
+Six layers control nest structure, larvae, workers, routes/targets, sensing and annotations. Pin by clicking or by keyboard-accessible entity selector; hidden pins remain identified, and overlapping workers have explicit selection. Camera state persists through seek/playback. Four-method comparison uses one renderer and one **actual tick** clock; finished methods hold their final state. Interactive 2D fallback retains playback, layers, picking and inspection.
 
-These render directly in GitHub:
+## Notebook And Code Guide
 
-| TSP | Greedy |
-| --- | --- |
-| ![TSP playable simulation](animations/simulation_tsp.gif) | ![Greedy playable simulation](animations/simulation_greedy.gif) |
+| File | Responsibility |
+|---|---|
+| `final_analysis_v2.ipynb` | Executed teaching report: data, assumptions, results, four replays, six figures and validation |
+| `research_model.py` | Research actions, policies, metrics and trace contract |
+| `run_research.py` | Sequential, resumable experiments and anonymized trace export |
+| `research_report.py` | Figures and interpretations; no duplicate simulation |
+| `research_results.json` | Derived summaries and per-tick metrics |
+| `validate_research.py` | Counts, pairing, provenance and replay/result consistency |
+| `web/` | TypeScript, Vite, Three.js workstation and browser checks |
+| `wasp_routing_analysis.py` | Unchanged legacy engine and reused preprocessing/placement |
+| `final_analysis.ipynb` | Previous report, retained as legacy |
 
-| Biased | Random |
-| --- | --- |
-| ![Biased playable simulation](animations/simulation_biased.gif) | ![Random playable simulation](animations/simulation_random.gif) |
+The original four GIF/HTML exports remain in `animations/` and belong to **legacy-v1**, not the new endpoint. GitHub sanitizes notebook JavaScript/iframes: open the live lab for v2 playback. Local Jupyter renders the live iframe embeds.
 
-### HTML Animations With Controls
+**Play the four original methods with research-v2 rules:** [NN tour](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=tsp), [persistent walk](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=biased), [random walk](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=random), [global weighted choice](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=greedy), or [synchronized comparison](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&compare=1).
 
-The same animations are also exported as standalone Matplotlib HTML files:
+## Run Locally
 
-- [`animations/simulation_tsp.html`](animations/simulation_tsp.html)
-- [`animations/simulation_greedy.html`](animations/simulation_greedy.html)
-- [`animations/simulation_biased.html`](animations/simulation_biased.html)
-- [`animations/simulation_random.html`](animations/simulation_random.html)
+Verified with Python 3.11 and Node.js 24; scientific packages are pinned and npm dependencies locked.
 
-GitHub does not execute notebook JavaScript the same way a local Jupyter session does, so the GIFs are included for direct README playback and the HTML files are included for local/browser playback with controls.
-
-### Final-State Snapshot Summary
-
-![Four strategy simulation final states](figures/simulation_all_strategies.png)
-
-The point of these visual exports is accountability. The summary tables prove the benchmark result numerically, while the animations show that the simulation is actually placing larvae, wasps, blocked nest cells, and final feeding states in a biologically interpretable nest-like layout.
-
-## Analysis Figures
-
-The final notebook keeps only plots that support specific claims:
-
-- Strategy scorecard across speed, distance, efficiency, and hunger.
-- Full scenario heatmap showing completion step for every nest-bout and strategy.
-- Delay plot showing how much slower each non-TSP method is compared with TSP on the same scenario.
-- Nest-level bar chart checking whether the ranking holds across `v14`, `v72`, and `v87`.
-- Efficiency frontier showing the tradeoff between speed and movement productivity.
-- Bout difficulty audit connecting observed activity, spatial breadth, and colony size to simulated completion time.
-
-Plots that only repeated "everything completed" or only visualized configuration choices were removed because they did not add scientific value.
-
-## Repository Guide
-
-| File | Purpose |
-| --- | --- |
-| `final_analysis.ipynb` | Main executed research notebook with tables, plots, selected animations, validation, and interpretation. |
-| `wasp_routing_analysis.py` | Script version of the benchmark pipeline for reproducible command-line runs. |
-| `figures/` | Exported four-strategy simulation plots used by the README. |
-| `animations/` | Playable GIF and standalone HTML animations for the four movement strategies. |
-| `generate_strategy_animations.py` | Script that regenerates the GIF/HTML animation assets from local CSV data. |
-| `requirements.txt` | Python dependencies needed to run the notebook/script. |
-| `.gitignore` | Prevents local datasets and generated outputs from being committed. |
-
-Older prototype notebooks are intentionally not the main deliverable. The final notebook is the one to use for grading, presentation, and project review.
-
-## How To Run Locally
-
-1. Clone the repository.
-
-```bash
-git clone https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps.git
-cd Bio-Inspired-Routing-Optimization-in-Social-Wasps
-```
-
-2. Add the two CSV files locally in the repo root.
-
-```text
-ED_FL_3nests1noC2.csv
-ALL_FL_minmaj_final3noC2.csv
-```
-
-3. Install dependencies.
-
-```bash
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m unittest test_research_model -v
+python validate_research.py
+python execute_research_notebook.py
+jupyter lab final_analysis_v2.ipynb
 ```
 
-4. Run the script benchmark.
+The report runs without private data. To regenerate experiments, place the two CSV files beside the scripts:
 
-```bash
-python wasp_routing_analysis.py --output-dir outputs
+```powershell
+python measure_smoke.py
+python run_research.py
+python research_report.py
+python build_research_notebook.py
+python execute_research_notebook.py
 ```
 
-5. Regenerate playable strategy animations if needed.
+Atomic checkpoints under ignored `outputs/` resume compatible tasks. Changed source, geometry or scenario configuration invalidates the key. One simulation worker is intentional on the 16 GB laptop.
 
-```bash
-python generate_strategy_animations.py --output-dir animations
+```powershell
+cd web
+npm ci
+npm run build
+npm test
+npm run dev
 ```
 
-6. Or open the notebook.
+Local browser tests use installed Chrome; CI installs Chromium. Add `?2d=1` to test fallback. Space plays/pauses and arrow keys step when focus is outside form controls. There is no autoplay or mandatory camera animation.
 
-```bash
-jupyter lab final_analysis.ipynb
-```
+## Verification And Device Budget
 
-## Validation Checks
+- [x] Legacy reproduced: 144 runs; NN-tour median 67, greedy 142.5, persistent 463.5, random 529.
+- [x] Nine public synthetic checks cover actions, feed-once, memory, claims, broadcast cost, RNG pairing, repeatability, censoring and frequency independence.
+- [x] 2,160 fair runs plus 720 ablations; all fair runs completed.
+- [x] Browser checks cover playback, seeking, four-method clock, hidden pins, orbit-vs-click, disposal, mobile and fallback.
+- [x] Dependency audit, locked build and private-data exclusion.
 
-The final notebook includes a validation cell confirming:
+Initial 18-run smoke: 4.0 seconds, measured peak Python RSS 217.4 MiB. Observed full-run Python RSS reached 328 MiB. A local playback sample measured 24 renders/s and about 25 MiB **JS heap**, not total browser process memory. Rendering is capped at 30 Hz, DPR at 1.5, hidden tabs pause, and old geometry is disposed. Hosted software-WebGL CI does not certify laptop FPS.
 
-- total nests analyzed: `3`
-- nests: `v14`, `v72`, `v87`
-- total scenarios: `36`
-- total fair simulations: `144`
-- best overall strategy: `tsp`
-- still-incomplete runs after extension: `0`
+## Limitations And Next Improvements
 
-The script was also run locally and reproduced:
+There is no measured hunger, calibrated physiology, realistic food transport, collision avoidance or biological 3D geometry. Synthetic replicas and reused layouts reduce generalizability; only three real nests are represented. Event interpretation and worker scaling need domain confirmation. Priority-weighted wait is an assumed objective, not measured welfare.
 
-- scenarios: `36`
-- fair simulations: `144`
-- best strategy: `tsp`
-- median TSP completion step: `67`
+Next: confirmed behavioral codebook, held-out nests, measured feeding timestamps, prespecified radius/resource sensitivity tests and calibrated transport. Learned policies and richer geometry should follow evidence that they answer a research question, not visual complexity alone.
 
-## Limitations
-
-This is a simulation benchmark, not a complete biological reconstruction.
-
-- Hunger growth and feeding drops are stylized rules, not directly fit from continuous physiological measurements.
-- The grid approximates the nest geometry rather than preserving exact continuous motion.
-- The `tsp` method is an optimization benchmark, not a literal cognitive model of wasps.
-- The current result uses one random seed for the final benchmark; future work should add multi-seed confidence intervals.
-- Wasp roles are simplified into forager, unloader, and feeder categories.
-
-## Next Improvements
-
-Strong next steps would be:
-
-- run repeated seeds and report uncertainty intervals,
-- calibrate hunger dynamics using bout timing,
-- test additional biologically plausible routing heuristics,
-- add continuous-space movement instead of grid movement,
-- compare observed worker paths directly with simulated strategy paths,
-- package the model as a small reusable simulation library.
+Legacy results and the original PDF remain preserved at [legacy-v1](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/legacy-v1).
