@@ -106,8 +106,7 @@ export class ReplayScene {
     }
     if (!this.renderer) this.fallback = this.canvas.getContext("2d");
     host.append(this.canvas);
-    // OrbitControls assumes the whole canvas is the viewport. Our titles/scissor
-    // panels need region-relative cursor zoom instead of that normalization.
+    // Handle trackpad gestures only inside a rendered panel, below its title.
     this.canvas.addEventListener('wheel', e => {
       if (!this.renderer || !this.views.length) return;
       const box = this.canvas.getBoundingClientRect();
@@ -121,26 +120,18 @@ export class ReplayScene {
       e.stopImmediatePropagation();
       const {camera, controls} = this.views[0], r = this.region(index);
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.h : 1;
-      // Trackpad scrolling translates the view; browsers report pinch as ctrl+wheel.
+      // Keep scrolling anchored to the nest; translating here can lose it entirely.
       if (!e.ctrlKey && !e.metaKey) {
-        const unitsPerPixel = 2 * camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / r.h;
-        const offset = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0).multiplyScalar(-e.deltaX * unit * unitsPerPixel)
-          .addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1), e.deltaY * unit * unitsPerPixel);
-        camera.position.add(offset);
-        controls.target.add(offset);
+        const orbit = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+        orbit.theta -= e.deltaX * unit * .005;
+        orbit.phi = THREE.MathUtils.clamp(orbit.phi - e.deltaY * unit * .005, .001, Math.PI - .001);
+        camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(orbit));
         controls.update();
         this.changed = true;
         return;
       }
-      this.ray.setFromCamera(new THREE.Vector2((x-r.x)/r.w*2-1, -(y-r.y)/r.h*2+1), camera);
-      const anchor = this.ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0), new THREE.Vector3()) ?? controls.target.clone();
-      const distance = camera.position.distanceTo(controls.target);
       const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.h : 1);
-      const scale = THREE.MathUtils.clamp(distance * Math.exp(THREE.MathUtils.clamp(delta,-500,500)*.001), controls.minDistance, controls.maxDistance) / distance;
-      camera.position.sub(anchor).multiplyScalar(scale).add(anchor);
-      controls.target.sub(anchor).multiplyScalar(scale).add(anchor);
-      controls.update();
-      this.changed = true;
+      this.zoom(Math.exp(THREE.MathUtils.clamp(delta,-500,500)*.001));
     }, {passive:false, capture:true});
     new ResizeObserver(() => {
       this.resize();
@@ -211,7 +202,8 @@ export class ReplayScene {
     camera.lookAt(0, 0, 0);
     const controls = new OrbitControls(camera, this.canvas);
     controls.target.set(0, 0, 0);
-    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.maxPolarAngle = Math.PI - .001;
+    controls.minPolarAngle = .001;
     controls.minDistance = 5;
     controls.maxDistance = 90;
     controls.enableDamping = false;

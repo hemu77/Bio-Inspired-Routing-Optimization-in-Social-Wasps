@@ -85,11 +85,11 @@ document.querySelector('#feeding-help')!.textContent = 'Blue means no feed yet. 
 scopeNote.textContent = 'Hunger-threshold completion, not measured physiological satiation.';
 $('progress-context').textContent = 'Hunger-based feeding round';
 document.querySelector('.layers > p')!.textContent = 'Workers may feed the same larva repeatedly until its remaining hunger reaches the threshold.';
-const navigationHelp = 'Drag to orbit. Two-finger scroll to pan sideways or up/down. Pinch (or Ctrl+scroll) to zoom. Shift-drag also pans. Reset view fits the whole nest.';
+const navigationHelp = 'Drag or two-finger scroll to rotate around the nest, including underneath. Pinch (or Ctrl+scroll) to zoom toward the center. Shift-drag or right-drag pans. Reset view fits the whole nest.';
 document.querySelector('#layer-controls > p:last-child')!.textContent = navigationHelp;
 const navigationHint = document.createElement('span');
 navigationHint.className = 'navigation-hint';
-navigationHint.textContent = 'Drag to orbit / two-finger scroll to pan / pinch to zoom';
+navigationHint.textContent = 'Drag or two-finger scroll to rotate / pinch to zoom / Shift-drag to pan';
 navigationHint.title = navigationHelp;
 document.querySelector('.view-tools')!.prepend(navigationHint);
 const expandView = document.createElement('button');

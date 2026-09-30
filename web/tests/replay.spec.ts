@@ -215,7 +215,7 @@ test('partial feeding is visible and green completion requires recorded low hung
   await expect(page.locator('#details')).toContainText('Full (model threshold)');
 });
 
-test('pointer-centered zoom, pan and reset keep the replay unchanged', async ({page}) => {
+test('centered zoom, deliberate pan and reset keep the replay unchanged', async ({page}) => {
   await ready(page, '/?scenario=v87-S06');
   const original = await state(page), box = await page.locator('canvas').boundingBox();
   if (!box) throw Error('Missing canvas');
@@ -223,7 +223,8 @@ test('pointer-centered zoom, pan and reset keep the replay unchanged', async ({p
   await page.keyboard.down('Control');
   await page.mouse.wheel(0,-250);
   await page.keyboard.up('Control');
-  await expect.poll(async() => (await state(page)).cameraTarget).not.toEqual(original.cameraTarget);
+  await expect.poll(async() => (await state(page)).camera).not.toEqual(original.camera);
+  expect((await state(page)).cameraTarget).toEqual(original.cameraTarget);
   const zoomed = await state(page);
   expect(zoomed.tick).toBe(original.tick);
   expect(zoomed.frames).toEqual(original.frames);
@@ -249,7 +250,7 @@ test('pointer-centered zoom, pan and reset keep the replay unchanged', async ({p
   expect(legend.y).toBeGreaterThanOrEqual(box.y+box.height);
 });
 
-test('wide replay supports two-axis trackpad pan and explicit zoom', async ({page}) => {
+test('wide replay keeps diagonal trackpad rotation centered, including underside', async ({page}) => {
   await ready(page, '/?scenario=v87-S06');
   const canvas = page.locator('canvas');
   await canvas.scrollIntoViewIfNeeded();
@@ -260,11 +261,12 @@ test('wide replay supports two-axis trackpad pan and explicit zoom', async ({pag
   const distance = (s: any) => Math.hypot(...s.camera.map((v:number,i:number) => v-s.cameraTarget[i]));
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
   await page.mouse.wheel(160,0);
-  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(initial.cameraTarget);
+  await expect.poll(async () => (await state(page)).camera).not.toEqual(initial.camera);
   const horizontal = await state(page);
   expect(distance(horizontal)).toBeCloseTo(distance(initial), 6);
   await page.mouse.wheel(0,160);
-  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(horizontal.cameraTarget);
+  await expect.poll(async () => (await state(page)).camera).not.toEqual(horizontal.camera);
+  expect((await state(page)).cameraTarget).toEqual(initial.cameraTarget);
   expect(distance(await state(page))).toBeCloseTo(distance(initial), 6);
   await page.locator('#zoom-in').click();
   expect(distance(await state(page))).toBeLessThan(distance(initial));
@@ -273,13 +275,17 @@ test('wide replay supports two-axis trackpad pan and explicit zoom', async ({pag
   await page.mouse.move(zoomBox.x+zoomBox.width/2,zoomBox.y+zoomBox.height/2);
   const beforeDiagonal = await state(page);
   await page.mouse.wheel(113,-79);
-  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(beforeDiagonal.cameraTarget);
+  await expect.poll(async () => (await state(page)).camera).not.toEqual(beforeDiagonal.camera);
   const diagonal = await state(page);
   expect(distance(diagonal)).toBeCloseTo(distance(beforeDiagonal),6);
-  expect(diagonal.cameraTarget[1]).not.toBeCloseTo(beforeDiagonal.cameraTarget[1],6);
-  expect(diagonal.cameraTarget[0]).not.toBeCloseTo(beforeDiagonal.cameraTarget[0],6);
-  await page.mouse.wheel(-113,79);
-  await expect.poll(async () => (await state(page)).cameraTarget[0]).toBeCloseTo(beforeDiagonal.cameraTarget[0],6);
+  expect(diagonal.cameraTarget).toEqual(initial.cameraTarget);
+  await page.mouse.wheel(2500,-1000);
+  await expect.poll(async () => (await state(page)).camera[1]).toBeLessThan(0);
+  expect((await state(page)).cameraTarget).toEqual(initial.cameraTarget);
+  expect(distance(await state(page))).toBeCloseTo(distance(beforeDiagonal),6);
+  await page.mouse.wheel(-140,120);
+  await expect.poll(async () => (await state(page)).camera[1]).toBeLessThan(0);
+  await page.screenshot({path:'test-results/orbit-underside.png'});
   expect((await state(page)).frames).toEqual(initial.frames);
   await page.locator('#zoom-out').click();
   expect(distance(await state(page))).toBeCloseTo(distance(initial), 6);
