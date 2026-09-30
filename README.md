@@ -9,7 +9,24 @@ A dataset-grounded agent experiment: how do searching workers finish feeding a c
 
 > Research-v3 marks a larva full only when remaining hunger is **at most 0.12**. There is **no three-feed cap**. Hunger, portions and recovery rates are assumptions, not measurements of biological satiation or food mass.
 
-![Dark-mode feeding round](docs/feeding-dark.png)
+## Four Methods. One Colony.
+
+**Same nest, same starting hunger, same 28 workers. Different routing decisions.**
+These looping previews replay the complete validated `v87-S06` round in the actual
+3D viewer. Blue larvae have not been fed; intermediate shades are partly fed;
+solid green means remaining hunger <= 0.12. Gold agents are workers.
+
+| TSP | Biased |
+|:---|:---|
+| [![TSP complete feeding round](docs/replays/tsp.gif)](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=tsp) | [![Biased complete feeding round](docs/replays/biased.gif)](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=biased) |
+| **Random** | **Greedy** |
+| [![Random complete feeding round](docs/replays/random.gif)](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=random) | [![Greedy complete feeding round](docs/replays/greedy.gif)](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=greedy) |
+
+Each preview holds its fully completed state before looping. Frames are evenly
+sampled and accelerated to keep the README lightweight: **GIF playback speed is
+not a method-speed comparison**. Read the actual tick counters and benchmark
+results below. Click any preview to inspect, pause or scrub that method in the lab.
+3D depth is illustrative; XY positions and feeding states come from recorded runs.
 
 ## Read The Simulation
 
@@ -142,6 +159,13 @@ npm run build
 npm test
 npm run dev
 ```
+
+To regenerate the README GIFs, leave that local server running and run
+`python export_readme_gifs.py` from the repository root in another terminal.
+The exporter uses installed Google Chrome and the same Three.js viewer, captures
+90 recorded states per method, and verifies the terminal hunger state and
+infinite-loop GIF metadata. Capture files stay in ignored `outputs/`; only the
+four finished GIFs and their sampling manifest are published.
 
 Ignored `outputs/` checkpoints resume only compatible source/geometry/scenario configurations. One simulation worker keeps the 16 GB workload bounded. Rendering uses one WebGL context, DPR at most 1.5 and a 30 Hz cap; hidden tabs pause. Local sampling measured 25 renders/s and about 39 MiB JS heap, not total browser RAM. Use `?2d=1` for fallback; orbit/pan/zoom require WebGL.
 
