@@ -85,7 +85,39 @@ document.querySelector('#feeding-help')!.textContent = 'Blue means no feed yet. 
 scopeNote.textContent = 'Hunger-threshold completion, not measured physiological satiation.';
 $('progress-context').textContent = 'Hunger-based feeding round';
 document.querySelector('.layers > p')!.textContent = 'Workers may feed the same larva repeatedly until its remaining hunger reaches the threshold.';
-document.querySelector('#layer-controls > p:last-child')!.textContent = 'Drag to orbit. Shift-drag or right-drag to pan; two-finger drag on touch. Scroll to zoom at the pointer. Reset view fits the nest again.';
+const navigationHelp = 'Drag to orbit. Two-finger scroll to pan sideways or up/down. Pinch (or Ctrl+scroll) to zoom. Shift-drag also pans. Reset view fits the whole nest.';
+document.querySelector('#layer-controls > p:last-child')!.textContent = navigationHelp;
+const navigationHint = document.createElement('span');
+navigationHint.className = 'navigation-hint';
+navigationHint.textContent = 'Drag to orbit / two-finger scroll to pan / pinch to zoom';
+navigationHint.title = navigationHelp;
+document.querySelector('.view-tools')!.prepend(navigationHint);
+const expandView = document.createElement('button');
+expandView.id = 'expand-view';
+expandView.textContent = 'Expand view';
+expandView.title = 'Use the full screen to inspect the nest; Escape returns to the page';
+expandView.hidden = !document.fullscreenEnabled;
+document.querySelector('.view-tools')!.append(expandView);
+expandView.onclick = async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.querySelector<HTMLElement>('.viewport')!.requestFullscreen();
+  } catch {
+    navigationHint.textContent = 'Full screen unavailable. Use page zoom or Reset view to fit the nest.';
+  }
+};
+document.addEventListener('fullscreenchange', () => {
+  expandView.textContent = document.fullscreenElement ? 'Exit full screen' : 'Expand view';
+  requestAnimationFrame(() => { scene.resize(); scene.reset(); });
+});
+for (const [id, label, scale] of [['zoom-in', 'Zoom in', .8], ['zoom-out', 'Zoom out', 1.25]] as const) {
+  const button = document.createElement('button');
+  button.id = id;
+  button.textContent = label;
+  button.disabled = !scene.renderer;
+  button.onclick = () => scene.zoom(scale);
+  $('top').before(button);
+}
 document.querySelector('.inspector .help p')!.textContent = 'The chart counts larvae reaching hunger ≤ 0.12, not larvae merely visited once. Partial feeding can occur during flat stretches. A tick permits each worker one move, feed or broadcast; it is not seconds.';
 $("mode").textContent = scene.renderer
   ? "3D / XY preserved"

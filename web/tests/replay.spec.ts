@@ -220,7 +220,9 @@ test('pointer-centered zoom, pan and reset keep the replay unchanged', async ({p
   const original = await state(page), box = await page.locator('canvas').boundingBox();
   if (!box) throw Error('Missing canvas');
   await page.mouse.move(box.x+box.width*.65, box.y+box.height*.65);
+  await page.keyboard.down('Control');
   await page.mouse.wheel(0,-250);
+  await page.keyboard.up('Control');
   await expect.poll(async() => (await state(page)).cameraTarget).not.toEqual(original.cameraTarget);
   const zoomed = await state(page);
   expect(zoomed.tick).toBe(original.tick);
@@ -245,6 +247,53 @@ test('pointer-centered zoom, pan and reset keep the replay unchanged', async ({p
   const legend = await page.locator('#legend').boundingBox();
   if (!legend) throw Error('Missing legend');
   expect(legend.y).toBeGreaterThanOrEqual(box.y+box.height);
+});
+
+test('wide replay supports two-axis trackpad pan and explicit zoom', async ({page}) => {
+  await ready(page, '/?scenario=v87-S06');
+  const canvas = page.locator('canvas');
+  await canvas.scrollIntoViewIfNeeded();
+  const box = (await canvas.boundingBox())!;
+  expect(box.width).toBeGreaterThan(1400);
+  expect(box.height).toBeGreaterThan(450);
+  const initial = await state(page);
+  const distance = (s: any) => Math.hypot(...s.camera.map((v:number,i:number) => v-s.cameraTarget[i]));
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+  await page.mouse.wheel(160,0);
+  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(initial.cameraTarget);
+  const horizontal = await state(page);
+  expect(distance(horizontal)).toBeCloseTo(distance(initial), 6);
+  await page.mouse.wheel(0,160);
+  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(horizontal.cameraTarget);
+  expect(distance(await state(page))).toBeCloseTo(distance(initial), 6);
+  await page.locator('#zoom-in').click();
+  expect(distance(await state(page))).toBeLessThan(distance(initial));
+  await canvas.scrollIntoViewIfNeeded();
+  const zoomBox = (await canvas.boundingBox())!;
+  await page.mouse.move(zoomBox.x+zoomBox.width/2,zoomBox.y+zoomBox.height/2);
+  const beforeDiagonal = await state(page);
+  await page.mouse.wheel(113,-79);
+  await expect.poll(async () => (await state(page)).cameraTarget).not.toEqual(beforeDiagonal.cameraTarget);
+  const diagonal = await state(page);
+  expect(distance(diagonal)).toBeCloseTo(distance(beforeDiagonal),6);
+  expect(diagonal.cameraTarget[1]).not.toBeCloseTo(beforeDiagonal.cameraTarget[1],6);
+  expect(diagonal.cameraTarget[0]).not.toBeCloseTo(beforeDiagonal.cameraTarget[0],6);
+  await page.mouse.wheel(-113,79);
+  await expect.poll(async () => (await state(page)).cameraTarget[0]).toBeCloseTo(beforeDiagonal.cameraTarget[0],6);
+  expect((await state(page)).frames).toEqual(initial.frames);
+  await page.locator('#zoom-out').click();
+  expect(distance(await state(page))).toBeCloseTo(distance(initial), 6);
+  await page.locator('#reset').click();
+  expect((await state(page)).camera).toEqual(initial.camera);
+  expect((await state(page)).frames).toEqual(initial.frames);
+  await page.locator('#expand-view').click();
+  await expect(page.locator('.viewport')).toHaveJSProperty('clientWidth', 1440);
+  await expect(page.locator('#expand-view')).toHaveText('Exit full screen');
+  await page.screenshot({path:'test-results/expanded-replay.png'});
+  await page.locator('#expand-view').click();
+  await expect(page.locator('#expand-view')).toHaveText('Expand view');
+  await canvas.scrollIntoViewIfNeeded();
+  await page.screenshot({path:'test-results/wide-replay.png'});
 });
 
 test('theme controls work when browser storage is unavailable', async ({page}) => {

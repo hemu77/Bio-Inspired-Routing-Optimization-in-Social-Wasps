@@ -120,6 +120,18 @@ export class ReplayScene {
       e.preventDefault();
       e.stopImmediatePropagation();
       const {camera, controls} = this.views[0], r = this.region(index);
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.h : 1;
+      // Trackpad scrolling translates the view; browsers report pinch as ctrl+wheel.
+      if (!e.ctrlKey && !e.metaKey) {
+        const unitsPerPixel = 2 * camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / r.h;
+        const offset = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0).multiplyScalar(-e.deltaX * unit * unitsPerPixel)
+          .addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1), e.deltaY * unit * unitsPerPixel);
+        camera.position.add(offset);
+        controls.target.add(offset);
+        controls.update();
+        this.changed = true;
+        return;
+      }
       this.ray.setFromCamera(new THREE.Vector2((x-r.x)/r.w*2-1, -(y-r.y)/r.h*2+1), camera);
       const anchor = this.ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0), new THREE.Vector3()) ?? controls.target.clone();
       const distance = camera.position.distanceTo(controls.target);
@@ -203,7 +215,7 @@ export class ReplayScene {
     controls.minDistance = 5;
     controls.maxDistance = 90;
     controls.enableDamping = false;
-    controls.screenSpacePanning = false;
+    controls.screenSpacePanning = true;
     controls.addEventListener("change", () => (this.changed = true));
     // Comparison keeps all cameras aligned; the first owns pointer controls.
     controls.enabled = index === 0;
@@ -547,26 +559,41 @@ export class ReplayScene {
       ? { kind: hit.object.userData.kind, index: hit.instanceId, view: index }
       : null;
   }
-  topDown() {
-    this.views.forEach((v) => {
-      v.camera.position.set(0, v.trace.grid_size * 1.6 * Math.max(1, 1 / v.camera.aspect), 0.001);
-      v.controls.target.set(0, 0, 0);
-      v.controls.update();
-    });
+  zoom(scale: number) {
+    const view = this.views[0];
+    if (!view) return;
+    const {camera, controls} = view;
+    const distance = camera.position.distanceTo(controls.target);
+    camera.position.sub(controls.target).multiplyScalar(THREE.MathUtils.clamp(distance * scale, controls.minDistance, controls.maxDistance) / distance).add(controls.target);
+    controls.update();
     this.changed = true;
   }
+  topDown() {
+    this.views.forEach(v => this.fitView(v, new THREE.Vector3(0, 1, .0001)));
+    this.changed = true;
+  }
+  private fitView(v: View, direction: THREE.Vector3) {
+    direction.normalize();
+    v.camera.position.copy(direction);
+    v.camera.lookAt(0, 0, 0);
+    const inverse = v.camera.quaternion.clone().invert();
+    const tanY = Math.tan(THREE.MathUtils.degToRad(v.camera.fov / 2));
+    const tanX = tanY * v.camera.aspect;
+    let distance = v.controls.minDistance;
+    // Fit all corners in camera space, including the near corner of an oblique nest.
+    for (const x of [-1, 1]) for (const y of [0, 1]) for (const z of [-1, 1]) {
+      const p = new THREE.Vector3(x * v.trace.grid_size / 2, y, z * v.trace.grid_size / 2).applyQuaternion(inverse);
+      distance = Math.max(distance, p.z + Math.abs(p.x) * 1.12 / tanX, p.z + Math.abs(p.y) * 1.12 / tanY);
+    }
+    v.controls.maxDistance = Math.max(90, distance * 2);
+    v.camera.far = Math.max(250, v.controls.maxDistance * 2);
+    v.camera.updateProjectionMatrix();
+    v.camera.position.copy(direction).multiplyScalar(distance);
+    v.controls.target.set(0, 0, 0);
+    v.controls.update();
+  }
   reset() {
-    this.views.forEach((v) => {
-      // Portrait views need extra margin for the diagonal nest footprint.
-      const fit = Math.max(1, 1 / v.camera.aspect) * (v.camera.aspect < 1 ? 1.15 : 1);
-      v.camera.position.set(
-        v.trace.grid_size * 0.85 * fit,
-        v.trace.grid_size * 1.18 * fit,
-        v.trace.grid_size * 1.1 * fit,
-      );
-      v.controls.target.set(0, 0, 0);
-      v.controls.update();
-    });
+    this.views.forEach(v => this.fitView(v, new THREE.Vector3(.85, 1.18, 1.1)));
     this.changed = true;
   }
   private selectedXY(trace: Trace, frame: Frame, view: number): XY | null {
