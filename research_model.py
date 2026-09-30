@@ -175,6 +175,9 @@ class ResearchModel:
             elif self.strategy.startswith("local_"):
                 neighbors = pos + MOVES
                 valid = np.flatnonzero(((neighbors >= 0) & (neighbors < self.size)).all(axis=1))
+                if not len(valid):
+                    self.reason[worker] = "no valid neighbour; stay"
+                    continue
                 counts = [self.visits[worker, *neighbors[i]] for i in valid]
                 minimum = min(counts)
                 tied = [i for i, count in zip(valid, counts) if count == minimum]

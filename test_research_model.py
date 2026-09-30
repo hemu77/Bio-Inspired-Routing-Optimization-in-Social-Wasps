@@ -5,6 +5,17 @@ from research_model import ResearchModel, run_model
 
 
 class ResearchChecks(unittest.TestCase):
+    def test_single_cell_local_policies_have_no_invalid_move(self):
+        for strategy in ('local_nearest', 'local_urgency_claims'):
+            with self.subTest(strategy=strategy):
+                model = ResearchModel([(0, 0)], [.2], ['L1'], 1, 2, 42, strategy)
+                summary, _, frames = run_model(model, 3, trace=True)
+                self.assertTrue(summary['finished'])
+                self.assertEqual(summary['completion_step'], 1)
+                self.assertEqual(summary['final_distance'], 0)
+                self.assertEqual(model.feed_counts.tolist(), [1])
+                self.assertEqual(frames[-1]['positions'], [[0, 0], [0, 0]])
+
     def test_partial_feed_and_no_three_feed_cap(self):
         m = ResearchModel([(2, 2)], [1.0], ['L1'], 5, 1, 42, 'random')
         for visit in range(3):

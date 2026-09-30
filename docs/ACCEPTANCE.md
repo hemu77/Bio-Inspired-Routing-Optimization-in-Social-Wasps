@@ -11,13 +11,19 @@ feeding endpoint. V2 is preserved at `research-v2-first-feed`.
 - [x] Validation reconstructs every growth/feed transition and rejects false completion.
 - [x] Dark and light themes preserve camera, clock, selection, layers and frames.
 - [x] Pointer-centered wheel zoom uses render-region coordinates; ground-plane pan and reset verified.
-- [x] `final_analysis_v3.ipynb` executed: 43 cells, six PNGs, 12 HTML outputs, no errors.
-- [x] Ten model tests and 22 browser tests pass, including corrupted replay rejection and Shift-drag pan.
+- [x] `final_analysis_v3.ipynb` executed: 43 cells, six PNGs, 13 HTML outputs, no errors.
+- [x] Eleven model tests and 22 browser tests pass, including single-cell local exploration, corrupted replay rejection and Shift-drag pan.
 - [x] Two bounded read-only reviews completed; findings and repairs are in `REVIEW_V3.md`.
 
 Rates are inherited assumptions, not calibrated physiology. Completion is
 absorbing within one round; another hunger cycle is outside scope. New results
 replace v2 rankings only for this new endpoint.
+
+The 2026-09-30 boundary audit reran all 2880 simulations in 549.91 seconds:
+scenario outcomes and curves exactly match the pre-fix results. Both local
+policies now stay safely on a one-cell grid. The confirmed source-paper framing,
+paired outcomes and remaining publication requirements are in
+[RESEARCH_READINESS.md](RESEARCH_READINESS.md).
 
 ## Historical: Research-v2
 

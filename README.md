@@ -44,6 +44,14 @@ Drag to orbit; **Shift-drag or right-drag to pan**. Touch supports two-finger pa
 
 Distributed allocation appears in colony behavior, inspection and service routing. Reaching a nearby target is different from completing the colony. Charging feeding and communication an action makes that trade-off inspectable. This project does not establish that real wasps use these algorithms.
 
+The biological starting point is Nitika Sharma and Raghavendra Gadagkar's
+[*Spatial organization of collective food distribution in a paper wasp society*](https://doi.org/10.1101/2023.10.13.562279).
+Their observed bouts end at food exhaustion; our synthetic round ends at full
+hunger-threshold coverage. Food transfers and real nutritional satiation are
+not reproduced. This is a **proposed computational extension**, suitable for
+discussion with the researchers, not a submission-ready biological replication.
+See the [research readiness audit](docs/RESEARCH_READINESS.md) for evidence and gaps.
+
 ## Research Question
 
 **With paired starting conditions, how do information, repeated feeding and coordination change completion time, movement and waiting?**
@@ -111,11 +119,25 @@ Rank reliability first, then median horizon-capped time, then median movement pe
 
 Unlike first-feed v2, local urgency now ranks ahead of local nearest by median completion time and movement; its initial-hunger-weighted wait is slightly higher. This is conditional simulation evidence, not a universal coordination win. Claims-off/global-sensing ablations remain separate.
 
+In the 360 paired comparisons with local nearest, urgency-plus-claims finishes
+faster in **215**, ties in **8** and is slower in **137**; the median paired
+difference is -4.5 ticks. The two policies tie at a nest-level median of 77.5 ticks
+on v72. These are descriptive comparisons, not significance tests or 360
+independent biological observations.
+
 Six figures address threshold coverage, reliability/time, travel per full larva, restricted waiting until completion, every scenario, and communication cost. Unfinished waits are censored at the fair horizon. Replicate envelopes are stochastic variability conditional on these layouts, not biological confidence intervals. Wait weights use initial hunger, not terminal hunger.
 
 ## What Is Distinctive
 
 The contribution is not decorative 3D. One audited engine connects results, readable analysis and inspectable events. Partial feeds and completion are separate; communication has a cost; local information stays local; paired replicates prevent scheduler confounding; failures cannot become cosmetic completed animations. Public synthetic checks require no private datasets. Depth is illustrative; XY is exactly the simulation's mapped geometry.
+
+Relative to the earlier four-method project, this adds three research mechanisms:
+**repeated demand instead of first contact**, **local information instead of
+unrestricted target knowledge**, and **coordination tested against claims-off
+and global-sensing controls**. The source paper discusses possible redundancy
+benefits of overlapping feeding; suppressing duplicate targets is therefore a
+computational hypothesis, not automatically an improvement in real colonies.
+The next research question is when efficiency gives way to robustness.
 
 ## Notebook And Code Guide
 
@@ -176,3 +198,10 @@ Preserved notebook-era players, unchanged: [TSP](https://hemu77.github.io/Bio-In
 [legacy-v1](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/legacy-v1) preserves the earlier report. [research-v2-first-feed](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/research-v2-first-feed) preserves the first-feed model, results and viewer. V3 restores inherited hunger growth/portion reductions but removes the three-feed cap at the user's request. It retains v2's one-cardinal-action budget, so it is not identical to the prototype. Old notebooks require their matching archived code; endpoints across versions are not directly comparable.
 
 Only three observed layouts exist. Duplication, uncalibrated rates, unlimited feeding and absorbing completion limit biological interpretation. Next: confirm the codebook, calibrate hunger/portions, test held-out nests and preregister sensitivity checks before claiming biological realism.
+
+`Bio-Inspired Routing Optimization in Social Wasps_d1.pdf` is the historical
+144-run project report, not the active v3 methods/results. Use
+`final_analysis_v3.ipynb` and its matching code for the current report. Publication
+as an extension still requires empirical alignment, sensitivity analysis,
+appropriate uncertainty, attribution and data-reuse permission; acceptance
+cannot be inferred from software verification.

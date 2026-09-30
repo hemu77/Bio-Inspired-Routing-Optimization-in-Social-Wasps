@@ -19,6 +19,13 @@ larva enough feeds to reach an explicit hunger threshold. The data supplies nest
 counts; the simulation is a controlled synthetic experiment, not a reconstruction
 of observed worker trajectories. This report covers v14, v72 and v87.
 
+The source study is Sharma and Gadagkar's
+[*Spatial organization of collective food distribution in a paper wasp society*](https://doi.org/10.1101/2023.10.13.562279).
+Its observed bouts end at food exhaustion, while my synthetic round targets full
+hunger-threshold coverage with unlimited feeding. Worker-to-worker food transfer
+is not modeled. This is a proposed computational extension, not a reproduction
+or a claim that these policies describe real wasps.
+
 **Read the endpoint carefully:** `served` means remaining hunger is at most 0.12.
 One feed may not be enough. I removed the original three-feed cap: feed count
 alone never means full. The inherited growth and portion sizes remain model
@@ -145,6 +152,13 @@ display(fair.groupby(['nest', 'strategy']).agg(
 display(runs)
 extended = pd.DataFrame(report['extended'])
 display(extended if not extended.empty else pd.DataFrame({'extended_pass': ['Not needed: all fair runs completed']}))
+
+# Pair the same scenario and seed; an aggregate median can hide policy reversals.
+paired = fair.pivot(index=['scenario', 'replicate'], columns='strategy', values='observed_steps')
+delta = paired['local_urgency_claims'] - paired['local_nearest']
+display(pd.DataFrame([{'comparison': 'Urgency + claims vs local nearest',
+    'faster': int((delta < 0).sum()), 'tied': int((delta == 0).sum()),
+    'slower': int((delta > 0).sum()), 'median_paired_tick_difference': delta.median()}]))
 """)
 markdown("""## 6. Playable Simulations
 Visualization is useful because the same aggregate score can hide repeated visits,
@@ -179,6 +193,14 @@ Read the newly executed ranking rather than transferring conclusions from v2.
 Explicit communication cost matters: claims are not automatically an improvement.
 The ablation helps separate the effect of hunger prioritization, coordination
 and information access rather than calling a visually appealing policy 'best'.
+The paired table also shows losses and ties: a lower overall median is not a
+universal win. Claims-off comparisons isolate claims within the urgency policy;
+comparing local nearest with urgency-plus-claims changes both mechanisms.
+
+The source study discusses possible redundancy benefits of repeated and
+overlapping feeding. Expiring claims are a counterfactual mechanism, not an
+observed wasp signal. A useful extension would test efficiency versus robustness
+under limited food and worker failure; those tests are not in this report.
 
 Only three real nest layouts are available; doubling larvae is synthetic. The
 random priorities are assumed rather than measured. Worker resource counts are
