@@ -3,13 +3,29 @@ import { ReplayScene, Entity } from "./scene";
 import { Manifest, Trace, labels, loadTrace, frameAt } from "./trace";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-<header><h1>Nest / Routing Lab</h1><div class="subtitle">Social wasp routing<br><span>Verified Python replays</span></div><nav aria-label="Replay configuration"><label>Nest <select id="scenario" aria-label="Nest scenario"></select></label><label>Strategy <select id="strategy" aria-label="Strategy"></select></label><label class="compare"><input id="compare" type="checkbox"> Compare four</label></nav></header>
-<main><aside class="layers"><h2>Layers</h2><div id="layers"></div><label class="opacity">Nest opacity<input id="opacity" type="range" min="0" max="100" value="50"></label><div class="guide"><p>Drag to orbit.<br>Scroll to zoom.<br>Click to pin an agent.</p><p>Depth is illustrative.<br>XY comes from the model.</p><p>One tick: move, first feed, or claim broadcast.</p><a href="https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps" target="_blank" rel="noreferrer">Code & research report</a></div></aside>
-<section class="viewport" aria-label="Simulation"><div class="view-tools"><button id="top">Top-down</button><button id="reset">Reset view</button><span id="mode"></span></div><div id="canvas"></div><div id="view-labels"></div><div id="hover" hidden></div><div class="legend" id="legend"><span><i class="waiting"></i>Waiting: initial priority</span><span><i class="fed"></i>Served: flattened body</span><span><i class="wasp"></i>Worker</span></div><div id="status" role="status">Loading verified replay...</div></section>
-<aside class="inspector"><h2>Agent Inspector</h2><label class="entity-label">Select / pin<select id="entity" aria-label="Inspect an agent"><option value="">No pinned agent</option></select></label><div id="details"><p>Pick a worker or larva to inspect its recorded state.</p></div><div id="overlap"></div><h3>Current frame</h3><dl id="metrics"></dl><p class="caveat">First-feed coverage, not satiation. Initial hunger is random and fixed; it is not observed physiology.</p></aside></main>
-<footer><button id="play" aria-label="Play replay">Play</button><label class="timeline">Actual tick <output id="tick">0</output><input id="seek" aria-label="Seek actual tick" type="range" min="0" max="1" value="0" step="1"></label><label>Speed <select id="speed" aria-label="Playback speed"><option value="10">10 ticks/s</option><option value="30" selected>30 ticks/s</option><option value="100">100 ticks/s</option></select></label><span id="perf"></span></footer>`;
+<header><div><h1>Nest / Routing Lab</h1><p class="subtitle">How do workers reach every larva?</p></div><nav aria-label="Replay configuration"><label>Nest & bout <select id="scenario" aria-label="Nest scenario"></select></label><label class="compare"><input id="compare" type="checkbox"> Compare original four</label></nav></header>
+<section class="method-bar" aria-label="Movement methods"><div class="method-heading"><span>Change the method, not the colony</span><label class="method-select">Method <select id="strategy" aria-label="Strategy"></select></label></div><div id="method-filters" role="group" aria-label="Choose one method"></div></section>
+<main><aside class="layers"><span class="eyebrow">The experiment</span><h2>One feeding round</h2><p>Workers search a fixed nest. Each waiting larva needs one visit and one feed.</p><h3 id="method-name"></h3><p id="method-explanation"></p><p id="population"></p><details class="help"><summary>What counts as fed?</summary><p id="feeding-help">A worker feeds a larva at its cell. Teal means it has received its first feed; this is not satiation or a complete biological feeding cycle. Initial hunger is a fixed, randomly assigned priority, not a measurement.</p></details><details id="provenance"><summary>Where these data come from</summary><p id="scenario-context"></p><p><code>ED_FL_3nests1noC2.csv</code> supplies nest coordinates and larval stages. <code>ALL_FL_minmaj_final3noC2.csv</code> supplies bout activity and observed worker counts.</p><p>Larvae are doubled with deterministic jitter, then mapped to a grid. Hunger is sampled by stage: L1 0.20-0.50, L2 0.45-0.75, L3 0.65-1.00. Movement is simulated, not an observed wasp trajectory. Depth is illustrative. Raw datasets stay private.</p></details><details id="layer-controls"><summary>Display layers & controls</summary><div id="layers"></div><label class="opacity">Nest opacity<input id="opacity" type="range" min="0" max="100" value="35"></label><p>Pin a worker to see its route and local sensing area. Amber line: recent movement. Teal line: target direction, not a travelled path.</p><p>Drag to orbit. Scroll to zoom. Click to pin an agent.</p></details><a class="report-link" href="https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps" target="_blank" rel="noreferrer">Read the research & limitations</a></aside>
+<section class="viewport" aria-label="Simulation"><div class="view-tools"><button id="top" title="Look straight down at the model grid">Top-down</button><button id="reset" title="Restore the initial camera without restarting the feeding round">Reset view</button><span id="mode"></span></div><div id="canvas"></div><div id="view-labels"></div><div id="hover" hidden></div><div class="legend" id="legend"><span><i class="waiting"></i>Waiting larva</span><span><i class="fed"></i>First feed received</span><span><i class="wasp"></i>Moving worker</span></div><div id="status" role="status">Loading verified replay...</div></section>
+<aside class="inspector"><span class="eyebrow" id="progress-context">This replay</span><h2 id="cycle-state">Round not started</h2><strong id="fed-count"></strong><progress id="coverage" aria-label="Larvae receiving their first feed" max="100" value="0"></progress><p id="remaining"></p><div class="cycle-chart"><span>Whole round: first-feed coverage</span><svg id="cycle-chart" viewBox="0 0 240 66" role="img" aria-label="Recorded first-feed coverage over the whole round"><title>Coverage from the first frame to the last frame</title><path id="coverage-path"/><circle id="coverage-cursor" r="3"/></svg><div id="milestones" role="group" aria-label="Jump to feeding milestones"></div></div><p id="run-summary"></p><details class="help"><summary>How to read the timeline</summary><p>The chart shows this recorded run, not an average or prediction. Each rise is a first feed; flat parts mean no new larvae were fed. Milestones jump to the first tick reaching that coverage. A tick is one activation of each worker: move, feed, or broadcast, not seconds.</p></details><h3>Latest feeding event</h3><div id="feed-events"></div><h3>Inspect an individual</h3><label class="entity-label">Select / pin<select id="entity" aria-label="Inspect an agent"><option value="">No pinned agent</option></select></label><div id="details"><p>Pick a worker or larva to inspect its recorded state.</p></div><div id="overlap"></div><details><summary>Travel & reproducibility</summary><dl id="metrics"></dl><p>Travel counts grid moves, not energy. Broadcasts cost a worker action. The seed reproduces this run; one replay does not establish which method is best.</p></details></aside></main>
+<footer><button id="play" aria-label="Play replay">Play</button><button id="restart" title="Return to tick zero">Restart</button><button id="next-feed" title="Jump to the next tick with a recorded first feed">Next feed</button><label class="timeline">Tick <output id="tick">0</output><input id="seek" aria-label="Seek actual tick" type="range" min="0" max="1" value="0" step="1"></label><label>Speed <select id="speed" aria-label="Playback speed"><option value="10" selected>10 ticks/s</option><option value="30">30 ticks/s</option><option value="100">100 ticks/s</option></select></label><span id="perf"></span></footer>`;
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
+const axis = document.createElement("div");
+axis.id = "cycle-axis";
+$("milestones").before(axis);
+const milestoneLabel = document.createElement("span");
+milestoneLabel.className = "milestone-label";
+milestoneLabel.textContent = "Jump to coverage:";
+$("milestones").before(milestoneLabel);
+$("cycle-chart").setAttribute("aria-describedby", "cycle-axis");
+const scopeNote = document.createElement("p");
+scopeNote.className = "scope-note";
+scopeNote.textContent = "First-feed coverage only. Not satiation or measured physiology.";
+$("population").after(scopeNote);
+const feedCaption = document.createElement("div");
+feedCaption.id = "feed-caption";
+$("canvas").after(feedCaption);
 const scenario = $<HTMLSelectElement>("scenario"),
   strategy = $<HTMLSelectElement>("strategy"),
   compare = $<HTMLInputElement>("compare"),
@@ -55,7 +71,30 @@ $<HTMLInputElement>("opacity").oninput = (e) => {
 for (const [value, label] of Object.entries(labels)) {
   strategy.add(new Option(label, value));
 }
-strategy.value = "local_urgency_claims";
+strategy.value = "local_nearest";
+const methodDescriptions: Record<string, string> = {
+  random: "No knowledge of larval locations. Each move chooses a random grid direction. A worker feeds when it happens to reach a waiting larva.",
+  biased: "No knowledge of larval locations. Workers tend to keep moving in the same direction, with a 25% chance to redraw it each move.",
+  tsp: "Knows the whole colony. Each worker follows a nearest-neighbour tour. This historical TSP label does not mean an optimal route.",
+  greedy: "Knows the whole colony. Chooses targets randomly, weighted toward higher initial hunger and shorter distance; it is not a deterministic nearest-target rule.",
+  local_nearest: "Sees nearby cells within three grid moves, and remembers observations. Chooses the nearest known waiting larva; explores when none is known.",
+  local_urgency_claims: "Sees nearby cells and remembers observations. Balances initial hunger against distance, then broadcasts short-lived target claims to nearby workers. Communication consumes a turn.",
+};
+for (const [value, label] of Object.entries(labels)) {
+  const button = document.createElement("button");
+  button.textContent = label;
+  button.dataset.method = value;
+  button.title = methodDescriptions[value];
+  button.onclick = () => {
+    strategy.value = value;
+    compare.checked = false;
+    strategy.disabled = false;
+    load();
+  };
+  $("method-filters").append(button);
+}
+type ScenarioContext = {observed_rows: number; observed_feeding_events: number; observed_unique_cells: number; observed_unique_wasps: number; scaled_larvae: number; n_wasps: number; grid_size: number};
+let contexts: {source_checksum: string; scenarios: Record<string, ScenarioContext>};
 let manifest: Manifest,
   traces: Trace[] = [],
   tick = 0,
@@ -88,6 +127,7 @@ function pin(entity: Entity | null) {
   options(entity);
   scene.changed = true;
   updateInspector();
+  updateCycle();
 }
 function showStatus(text: string) {
   $("status").textContent = text;
@@ -98,8 +138,13 @@ async function load() {
   abort = new AbortController();
   const controller = abort;
   loading = true;
-  playing = false;
-  $("play").textContent = "Play";
+  pause();
+  $("canvas").style.visibility = "hidden";
+  feedCaption.hidden = true;
+  $("view-labels").replaceChildren();
+  $<HTMLButtonElement>("next-feed").disabled = true;
+  document.querySelectorAll<HTMLButtonElement>("[data-method]").forEach(button =>
+    button.setAttribute("aria-pressed", String(!compare.checked && button.dataset.method === strategy.value)));
   showStatus("Loading and validating recorded states...");
   try {
     const selection = manifest.scenarios.find((s) => s.id === scenario.value)!;
@@ -112,6 +157,9 @@ async function load() {
       ),
     );
     if (controller !== abort) return;
+    const context = contexts.scenarios[selection.id];
+    if (!context || (["observed_rows", "observed_feeding_events", "observed_unique_cells", "observed_unique_wasps", "scaled_larvae", "n_wasps", "grid_size"] as const).some(key => !Number.isInteger(context[key]) || context[key] < 0) || contexts.source_checksum !== manifest.source_checksum || data.some(t => t.larvae.length !== context.scaled_larvae || t.workers.length !== context.n_wasps || t.grid_size !== context.grid_size))
+      throw Error("Dataset context does not match this replay");
     traces = data;
     tick = 0;
     focused = 0;
@@ -119,16 +167,44 @@ async function load() {
     seek.max = String(maximum());
     seek.value = "0";
     pin(null);
+    $("population").textContent = `${context.scaled_larvae} synthetic larvae / ${context.n_wasps} simulated workers / ${context.grid_size} x ${context.grid_size} grid`;
+    $("scenario-context").textContent = `${context.observed_rows} recorded rows; ${context.observed_feeding_events} grouped activity events; ${context.observed_unique_cells} observed cells; ${context.observed_unique_wasps} observed workers. These bout counts set resources; they are not the simulation's feeding events. Activity grouping remains an assumption pending a codebook.`;
+    $("method-name").textContent = compare.checked ? "Four baseline methods" : labels[strategy.value];
+    $("method-explanation").textContent = compare.checked ? "Same colony, resources and paired seed. All views share the same actual tick. Completed methods hold their last state. Select a method above to return to one clear view." : methodDescriptions[strategy.value];
+    $("canvas").style.visibility = "visible";
     updateLabels();
     updateInspector();
     showStatus("");
   } catch (error) {
     if (controller.signal.aborted) return;
+    traces = [];
+    feedCaption.hidden = true;
+    scene.setTraces([]);
+    $("fed-count").textContent = "Replay unavailable";
+    $<HTMLProgressElement>("coverage").value = 0;
+    $("remaining").textContent = "No verified states to display.";
+    $("feed-events").replaceChildren();
+    $("milestones").replaceChildren();
+    $("cycle-chart").dataset.trace = "";
+    document.getElementById("coverage-path")!.setAttribute("d", "");
+    document.getElementById("coverage-cursor")!.setAttribute("cx", "-10");
+    $("cycle-state").textContent = "Could not open this run";
+    $("run-summary").textContent = "";
+    $("cycle-axis").textContent = "";
+    $("details").replaceChildren();
+    $("metrics").replaceChildren();
+    $("scenario-context").textContent = "Context unavailable for this replay.";
+    $("population").textContent = "";
+    $("method-explanation").textContent = "Choose another method or scenario to retry.";
+    $<HTMLSelectElement>("entity").replaceChildren(new Option("No pinned agent", ""));
     showStatus(
       `Replay could not load: ${(error as Error).message}. Choose another scenario or reload.`,
     );
   } finally {
-    if (controller === abort) loading = false;
+    if (controller === abort) {
+      loading = false;
+      updateCycle();
+    }
   }
 }
 function updateLabels() {
@@ -151,6 +227,66 @@ function updateLabels() {
   });
   $("tick").textContent = `${Math.floor(tick)} / ${maximum()}`;
   seek.value = String(Math.floor(tick));
+  updateCycle();
+}
+
+// Presentation is derived only from stored first-feed events; no browser simulation.
+function updateCycle() {
+  const trace = traces[focused];
+  if (!trace) return;
+  const frame = frameAt(trace, tick), total = trace.larvae.length;
+  const complete = frame.fed === total;
+  $("progress-context").textContent = `${trace.scenario} / ${labels[trace.strategy]}`;
+  $("cycle-state").textContent = complete ? "Round complete" : frame.fed ? "Feeding in progress" : "Searching for the first feed";
+  $("fed-count").textContent = `${frame.fed} / ${total} fed`;
+  $<HTMLProgressElement>("coverage").value = frame.fed / total * 100;
+  $("remaining").textContent = `${total - frame.fed} waiting / ${(frame.fed / total * 100).toFixed(1)}% covered`;
+  $("run-summary").textContent = trace.summary.finished ? `This run finishes at tick ${trace.summary.completion_step}. Every larva receives one first feed.` : `Stopped at tick ${trace.summary.observed_steps}; coverage remains incomplete.`;
+  const lastTick = Math.max(1, trace.frames.at(-1)!.tick);
+  document.getElementById("coverage-cursor")!.setAttribute("cx", String(4 + frame.tick / lastTick * 232));
+  document.getElementById("coverage-cursor")!.setAttribute("cy", String(58 - frame.fed / total * 50));
+  // Rebuild the full-round chart only when the focused trace changes.
+  if ($("cycle-chart").dataset.trace !== `${trace.scenario}:${trace.strategy}:${trace.seed}`) {
+    $("cycle-chart").dataset.trace = `${trace.scenario}:${trace.strategy}:${trace.seed}`;
+    axis.replaceChildren();
+    for (const text of ["0 ticks / 0%", `${lastTick} ticks / ${(trace.frames.at(-1)!.fed / total * 100).toFixed(1)}%`]) {
+      const label = document.createElement("span");
+      label.textContent = text;
+      axis.append(label);
+    }
+    let path = "M4 58";
+    for (const f of trace.frames) path += ` H${4 + f.tick / lastTick * 232} V${58 - f.fed / total * 50}`;
+    document.getElementById("coverage-path")!.setAttribute("d", path);
+    $("milestones").replaceChildren();
+    for (const percentage of [0, 25, 50, 75, 100]) {
+      const milestone = trace.frames.find(f => f.fed / total * 100 >= percentage);
+      const button = document.createElement("button");
+      button.textContent = `${percentage}%`;
+      button.setAttribute("aria-label", `${percentage}% fed`);
+      button.title = milestone ? `First reaches ${percentage}% at tick ${milestone.tick}` : "Not reached in this run";
+      button.disabled = !milestone;
+      button.onclick = () => jump(milestone!.tick);
+      $("milestones").append(button);
+    }
+  }
+  let eventFrame = frame;
+  while (eventFrame.tick > 0 && !eventFrame.events.some(e => e.type === "first_feed"))
+    eventFrame = trace.frames[eventFrame.tick - 1];
+  const events = eventFrame.events.filter(e => e.type === "first_feed");
+  $("feed-events").replaceChildren();
+  if (!events.length) $("feed-events").textContent = "No feed yet. Press Play or Next feed to find the first recorded event.";
+  feedCaption.hidden = traces.length !== 1 || !scene.layers.annotations;
+  feedCaption.textContent = events.length
+    ? `Latest feed, tick ${eventFrame.tick}: ${trace.workers[Number(events[0].worker)]} fed ${trace.larvae[Number(events[0].larva)].id}${events.length > 1 ? ` / ${events.length - 1} more at this tick` : ""}`
+    : "Press Play to follow the round, or Next feed to inspect an event.";
+  for (const event of events) {
+    const button = document.createElement("button");
+    button.textContent = `Tick ${eventFrame.tick}: ${trace.workers[Number(event.worker)]} fed ${trace.larvae[Number(event.larva)].id}`;
+    button.title = "Pin this larva to inspect its first-feed state";
+    button.onclick = () => pin({kind: "larva", index: Number(event.larva), view: focused});
+    $("feed-events").append(button);
+  }
+  $<HTMLButtonElement>("next-feed").disabled = loading || !trace.frames.some(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed"));
 }
 function definitions(host: HTMLElement, rows: [string, string][]) {
   host.replaceChildren();
@@ -287,12 +423,14 @@ scene.canvas.addEventListener("pointermove", (e) => {
   hover.hidden = !picked;
   if (picked) {
     const t = traces[picked.view];
-    hover.textContent =
-      picked.kind === "worker"
-        ? t.workers[picked.index]
-        : picked.kind === "larva"
-          ? t.larvae[picked.index].id
-          : "Cell";
+    const frame = frameAt(t, tick);
+    if (picked.kind === "worker") {
+      const target = frame.targets[picked.index];
+      hover.textContent = `${t.workers[picked.index]} / ${target >= 0 ? `target ${t.larvae[target].id}` : "exploring"} / click to inspect`;
+    } else if (picked.kind === "larva") {
+      const larva = t.larvae[picked.index], feed = frame.first_feed[picked.index];
+      hover.textContent = `${larva.id} / ${larva.stage} / ${feed >= 0 ? `first fed at tick ${feed}` : "waiting"} / initial priority ${larva.hunger.toFixed(2)}`;
+    } else hover.textContent = "Traversable background cell / not a larva";
   }
 });
 scene.canvas.addEventListener("pointerleave", () => ($("hover").hidden = true));
@@ -315,35 +453,44 @@ function togglePlay() {
   );
   last = performance.now();
 }
-$("play").onclick = togglePlay;
-seek.oninput = () => {
-  tick = Number(seek.value);
+function pause() {
   playing = false;
   $("play").textContent = "Play";
+  $("play").setAttribute("aria-label", "Play replay");
+}
+function jump(to: number) {
+  if (loading || !traces.length) return;
+  tick = Math.max(0, Math.min(maximum(), to));
+  pause();
   scene.changed = true;
   updateLabels();
   updateInspector();
-};
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    playing = false;
-    $("play").textContent = "Play";
+}
+$("restart").onclick = () => jump(0);
+$("next-feed").onclick = () => {
+  const trace = traces[focused];
+  const next = trace?.frames.find(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed"));
+  if (next) {
+    jump(next.tick);
+    const feed = next.events.find(e => e.type === "first_feed")!;
+    pin({kind: "larva", index: Number(feed.larva), view: focused});
   }
+};
+$("play").onclick = togglePlay;
+seek.oninput = () => jump(Number(seek.value));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pause();
 });
 document.addEventListener("keydown", (e) => {
-  if ((e.target as HTMLElement).matches("input,select,button,a")) return;
+  if (e.key === "Escape") document.querySelectorAll<HTMLDetailsElement>(".help[open]").forEach(d => d.open = false);
+  if ((e.target as HTMLElement).matches("input,select,button,a,summary")) return;
   if (e.code === "Space") {
     e.preventDefault();
     togglePlay();
   }
   if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-    tick = Math.max(
-      0,
-      Math.min(maximum(), Math.floor(tick) + (e.key === "ArrowRight" ? 1 : -1)),
-    );
-    scene.changed = true;
-    updateLabels();
-    updateInspector();
+    e.preventDefault();
+    jump(Math.floor(tick) + (e.key === "ArrowRight" ? 1 : -1));
   }
 });
 function animate(now: number) {
@@ -358,8 +505,7 @@ function animate(now: number) {
     );
     scene.changed = true;
     if (tick >= maximum()) {
-      playing = false;
-      $("play").textContent = "Play";
+      pause();
     }
   }
   if (now - lastDraw >= 1000 / 30 && (scene.changed || playing)) {
@@ -378,24 +524,24 @@ function animate(now: number) {
   }
 }
 requestAnimationFrame(animate);
-fetch("manifest.json")
-  .then((r) => {
-    if (!r.ok) throw Error("Manifest missing");
-    return r.json();
-  })
-  .then((value: Manifest) => {
+Promise.all(["manifest.json", "scenario-context.json"].map(path => fetch(path).then(r => {
+  if (!r.ok) throw Error(`${path} missing`);
+  return r.json();
+})))
+  .then(([value, context]) => {
     if (
       value.model_version !== "research-v2" ||
       !Array.isArray(value.scenarios) ||
       !value.scenarios.length
     )
       throw Error("Invalid manifest");
-    manifest = value;
-    value.scenarios.forEach((s) =>
-      scenario.add(new Option(`${s.id} / ${s.label}`, s.id)),
+    manifest = value as Manifest;
+    contexts = context;
+    manifest.scenarios.forEach((s) =>
+      scenario.add(new Option(`${s.id} / ${s.label.includes("incomplete") ? "slow-run example" : "representative example"}`, s.id)),
     );
     const query = new URLSearchParams(location.search);
-    if (value.scenarios.some((s) => s.id === query.get("scenario")))
+    if (manifest.scenarios.some((s) => s.id === query.get("scenario")))
       scenario.value = query.get("scenario")!;
     if (labels[query.get("strategy") || ""])
       strategy.value = query.get("strategy")!;

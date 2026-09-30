@@ -9,7 +9,19 @@ An agent-based project asking how movement, local information and worker coordin
 
 > Research-v2 measures **first-feed coverage**, not satiation. Random initial hunger is an assumed priority, not measured physiology. Depth is illustrative; XY comes from the mapped simulation.
 
-![Layer-first replay workstation](docs/lab-preview.png)
+![Single-method feeding-round replay](docs/lab-preview.png)
+
+## Read The Replay
+
+Start with one method. The method buttons switch the rule while retaining the selected nest-bout scenario; the original four-way comparison remains opt-in. The left explanation tells you what that method can know. A single replay illustrates a mechanism, not the overall ranking.
+
+Press **Next feed** to jump to a recorded feeding event and outline that larva in white. **Play** follows every stored tick; **Restart** returns to the same starting state. Amber/coral larvae are waiting; teal larvae have received their first feed. The body-shape change is a display cue, not a physiological observation.
+
+The coverage chart shows the complete recorded round: horizontal position is actual model time, vertical position is first-feed coverage. Its cursor marks the current frame. Coverage milestones jump to the first tick reaching 0%, 25%, 50%, 75% or 100%; they are navigation buttons, not the chart's time-axis labels. The final count and completion tick come from the trace, never a cosmetic animation stop.
+
+Open **What counts as fed?**, **How to read the timeline**, or **Where these data come from** for beginner explanations. Method and control tooltips explain actions; hovering an agent shows its recorded target or feeding state. Display layers and reproducibility details are folded away until needed. The dataset drawer separates observed bout counts from simulated feeding events and random hunger.
+
+The redesign borrows a communication principle from [Simile's public presentation](https://www.simile.com/): state the question, distinguish grounding from assumptions, and explain validation before adding visual complexity. This is not a review of its private product, a Simile affiliation, or a claim that this model has comparable behavioral calibration.
 
 ## Why This Project Matters
 
@@ -110,6 +122,7 @@ Six layers control nest structure, larvae, workers, routes/targets, sensing and 
 | `research_report.py` | Figures and interpretations; no duplicate simulation |
 | `research_results.json` | Derived summaries and per-tick metrics |
 | `validate_research.py` | Counts, pairing, provenance and replay/result consistency |
+| `export_viewer_context.py` | Small selected-scenario metadata export, checked against saved results and all 24 traces |
 | `web/` | TypeScript, Vite, Three.js workstation and browser checks |
 | `wasp_routing_analysis.py` | Unchanged legacy engine and reused preprocessing/placement |
 | `final_analysis.ipynb` | Previous report, retained as legacy |
@@ -137,6 +150,7 @@ The report runs without private data. To regenerate experiments, place the two C
 ```powershell
 python measure_smoke.py
 python run_research.py
+python export_viewer_context.py
 python research_report.py
 python build_research_notebook.py
 python execute_research_notebook.py

@@ -1,0 +1,41 @@
+{
+  "source_checksum": "cb088b1a60730d445d3ac8108c81d6961270ae814427cc2ec15de8234297f410",
+  "scenarios": {
+    "v14-S08": {
+      "observed_rows": 97,
+      "observed_feeding_events": 41,
+      "observed_unique_cells": 45,
+      "observed_unique_wasps": 12,
+      "scaled_larvae": 68,
+      "n_wasps": 15,
+      "grid_size": 22
+    },
+    "v72-S07": {
+      "observed_rows": 20,
+      "observed_feeding_events": 9,
+      "observed_unique_cells": 12,
+      "observed_unique_wasps": 8,
+      "scaled_larvae": 106,
+      "n_wasps": 23,
+      "grid_size": 25
+    },
+    "v87-S06": {
+      "observed_rows": 307,
+      "observed_feeding_events": 98,
+      "observed_unique_cells": 76,
+      "observed_unique_wasps": 19,
+      "scaled_larvae": 134,
+      "n_wasps": 28,
+      "grid_size": 28
+    },
+    "v87-S03": {
+      "observed_rows": 307,
+      "observed_feeding_events": 202,
+      "observed_unique_cells": 68,
+      "observed_unique_wasps": 17,
+      "scaled_larvae": 134,
+      "n_wasps": 30,
+      "grid_size": 28
+    }
+  }
+}

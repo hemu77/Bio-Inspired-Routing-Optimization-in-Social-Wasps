@@ -25,6 +25,7 @@ type View = {
   routes: THREE.Group;
   sensing: THREE.Group;
   cells: THREE.InstancedMesh;
+  marker: THREE.Mesh;
   trace: Trace;
 };
 const teal = new THREE.Color("#51b5a1"),
@@ -42,7 +43,7 @@ export class ReplayScene {
     routes: true,
     sensing: true,
     annotations: true,
-    opacity: 0.5,
+    opacity: 0.35,
   };
   selected: Entity | null = null;
   changed = true;
@@ -155,8 +156,8 @@ export class ReplayScene {
     const grid = new THREE.GridHelper(
       trace.grid_size,
       trace.grid_size,
-      "#5d6b6c",
-      "#354144",
+      "#465655",
+      "#2d383b",
     );
     structure.add(grid);
     const cellPoints = [
@@ -211,6 +212,10 @@ export class ReplayScene {
     );
     larvae.userData.kind = "larva";
     scene.add(larvae);
+    const marker = new THREE.Mesh(new THREE.RingGeometry(.43, .49, 24), new THREE.MeshBasicMaterial({color: "#ffffff", side: THREE.DoubleSide}));
+    marker.rotation.x = -Math.PI / 2;
+    marker.visible = false;
+    scene.add(marker);
     const wasps = [0, 1, 2, 3, 4].map((segment) => {
       const mesh = new THREE.InstancedMesh(
         new THREE.SphereGeometry(1, 8, 6),
@@ -236,6 +241,7 @@ export class ReplayScene {
       routes,
       sensing,
       cells,
+      marker,
       trace,
     };
   }
@@ -354,6 +360,9 @@ export class ReplayScene {
       view.larvae.computeBoundingSphere();
       this.clearGroup(view.routes);
       this.clearGroup(view.sensing);
+      const selectedXY = this.selectedXY(trace, frame, i);
+      view.marker.visible = !!selectedXY;
+      if (selectedXY) view.marker.position.set(selectedXY[0] - size / 2, .32, selectedXY[1] - size / 2);
       if (this.selected?.view === i && this.selected.kind === "worker") {
         const worker = this.selected.index,
           p = frame.positions[worker];
@@ -493,7 +502,8 @@ export class ReplayScene {
   }
   reset() {
     this.views.forEach((v) => {
-      const fit = Math.max(1, 1 / v.camera.aspect);
+      // Portrait views need extra margin for the diagonal nest footprint.
+      const fit = Math.max(1, 1 / v.camera.aspect) * (v.camera.aspect < 1 ? 1.15 : 1);
       v.camera.position.set(
         v.trace.grid_size * 0.85 * fit,
         v.trace.grid_size * 1.18 * fit,
@@ -503,6 +513,13 @@ export class ReplayScene {
       v.controls.update();
     });
     this.changed = true;
+  }
+  private selectedXY(trace: Trace, frame: Frame, view: number): XY | null {
+    const selected = this.selected;
+    if (!selected || selected.view !== view) return null;
+    if (selected.kind === "worker") return this.layers.wasps ? frame.positions[selected.index] : null;
+    if (selected.kind === "larva") return this.layers.larvae ? trace.larvae[selected.index].xy : null;
+    return this.layers.structure ? [...trace.larvae.map(l => l.xy), ...trace.background_cells][selected.index] : null;
   }
   private draw2d(tick: number) {
     const ctx = this.fallback;
@@ -574,12 +591,13 @@ export class ReplayScene {
         trace.larvae.forEach((l, j) => {
           const p = project(l.xy),
             fed = frame.first_feed[j] >= 0;
-          ctx.fillStyle = fed ? "#51b5a1" : "#d49a49";
+          const radius = {L1: .16, L2: .23, L3: .29}[l.stage] || .2;
+          ctx.fillStyle = fed ? "#51b5a1" : `#${amber.clone().lerp(new THREE.Color("#c35f42"), l.hunger).getHexString()}`;
           ctx.beginPath();
           ctx.ellipse(
             ...p,
-            scale * 0.22,
-            scale * (fed ? 0.12 : 0.23),
+            scale * radius,
+            scale * radius * (fed ? .5 : 1.3),
             0,
             0,
             Math.PI * 2,
@@ -597,6 +615,15 @@ export class ReplayScene {
             scale * 0.24,
           );
         });
+      const selectedXY = this.selectedXY(trace, frame, i);
+      if (selectedXY) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(...project(selectedXY), scale * .49, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
     });
     this.changed = false;
   }

@@ -9,8 +9,8 @@ Checkboxes become checked only after evidence is recorded. RED means failing or 
 | Notebook duplicated simulation classes | Results could drift between exports | One research engine for benchmark, notebook and replay | RED -> GREEN replay repeatability |
 | Single-run ranking | No stochastic stability check | Ten paired replicates, all 36 scenarios, separately reported ablations | RED -> GREEN 2160 fair + 720 ablation runs |
 | Composite difficulty and four-point frontier | Unjustified weights and redundant evidence | Six explicit research questions, censoring and conditional uncertainty | RED -> GREEN six inspected, executed PNGs |
-| GIF-only simulation | No inspection or interactive layers | Actual-tick Python replays, layer-first 3D and 2D fallback | RED -> GREEN six local browser tests |
-| No public regression checks | Private data needed to test | Public synthetic tests and CI; datasets stay private | RED -> GREEN nine unit tests, six browser tests, hosted CI |
+| GIF-only simulation | No inspection or interactive layers | Actual-tick Python replays, layer-first 3D and 2D fallback | RED -> GREEN nine local browser tests |
+| No public regression checks | Private data needed to test | Public synthetic tests and CI; datasets stay private | RED -> GREEN nine unit tests, nine browser tests, hosted CI |
 
 ## Checklist
 - [x] Legacy benchmark reproduced: 144 runs; NN-tour median 67, greedy 142.5, persistent 463.5, random 529.
@@ -42,10 +42,35 @@ Observed full-run Python RSS: 328 MiB. Dependencies: npm audit zero vulnerabilit
 Source digest includes normalized engine, experiment runner and legacy-helper code;
 checkpoint fingerprint also includes derived geometry and scenario configuration.
 
+## Clarity Upgrade
+
+| Before | Why it failed a first-time reader | Now | Evidence |
+|---|---|---|---|
+| Layers, seed and FPS led the screen | No clear question or method explanation | Research question, one selected method, readable rule | GREEN: beginner-flow browser test |
+| Four moving views encouraged scanning | Feeding events were too small to follow | One method by default; explicit method filters; comparison opt-in | GREEN: six filters each end at 134/134 on v87-S06 |
+| Served count sat inside a tiny label | No clear beginning, waiting population or end | Coverage meter, waiting count, whole-round staircase, completion tick | GREEN: recorded event and milestone assertions |
+| Picking changed text only | The inspected larva could not be located | White selection outline in 3D and 2D, feed caption | GREEN: inspected screenshots and retained pin checks |
+| Provenance lived in the README | Synthetic motion could look like observed biology | Dataset drawer and always-visible first-feed limitation | GREEN: source digest and 24 resource/trace cross-checks |
+| An export mismatch could confuse readers | Unverified context must never look complete | Reject mismatched context, clear states, show a recovery message | GREEN: mismatch-and-recovery browser test |
+
+- [x] The focused RED test failed because the coverage control was absent; it passed after implementation.
+- [x] Nine browser tests pass, including novice flow, all method filters, mismatch recovery, mobile, fallback and comparison.
+- [x] Nine Python tests and stored-result validation pass: 36 scenarios, 2160 fair runs, 720 ablations, 24 replays.
+- [x] Model source digest remains unchanged; no new biological claims or fabricated feeding events.
+
+Reference: [Simile public presentation](https://www.simile.com/), inspected for question-first communication and explicit grounding/validation. Its private application was not inspected; no affiliation or equivalence is claimed.
+
+![Verified single-method terminal state: v87-S06, NN tour, 134/134 first feeds at tick 162](feeding-complete.jpg)
+
+Local upgrade playback sample: 24 renders/s, approximately 24.3 MiB JS heap;
+this is not total browser RAM. Desktop and portrait screenshots were inspected.
+
 ## Viewer Design Contract
 Warm off-white rails, charcoal viewport, amber workers and teal served larvae.
-Left: six layers. Center: mapped square cells and low-poly segmented workers.
-Right: pinned entity inspector. Bottom: actual-tick playback, seek and speed.
+Top: research question, scenario and single-method filters. Left: method explanation,
+data provenance and optional display layers. Center: mapped square cells and workers.
+Right: feeding progress, recorded full-round coverage, events and entity inspection.
+Bottom: actual-tick playback, next-feed navigation, restart, seek and speed.
 Nest depth is illustrative; XY coordinates are exactly simulation coordinates.
 Stage controls body size; priority controls waiting color; served state also changes shape.
 No 3D biology is inferred from planar observations. Hidden layers are not pickable;

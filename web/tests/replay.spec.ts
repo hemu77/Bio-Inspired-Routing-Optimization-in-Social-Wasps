@@ -5,6 +5,71 @@ async function ready(page: any, url = "/") {
   await page.goto(url);
   await expect(page.locator("#status")).toBeHidden({ timeout: 30000 });
 }
+
+test("beginner flow shows one method, real feeding milestones and provenance", async ({page}) => {
+  await ready(page);
+  await expect(page.locator('.view-label')).toHaveCount(1);
+  await expect(page.locator('#coverage')).toHaveAttribute('value', '0');
+  await page.getByRole('button', {name: 'Random walk', exact: true}).click();
+  await expect(page.locator('#status')).toBeHidden();
+  await expect(page.locator('#strategy')).toHaveValue('random');
+  await expect(page.locator('.view-label')).toHaveCount(1);
+  await expect(page.locator('#method-explanation')).toContainText('No knowledge');
+  await page.getByText('What counts as fed?', {exact: true}).click();
+  await expect(page.locator('#feeding-help')).toBeVisible();
+  await expect(page.locator('#feeding-help')).toContainText('not satiation');
+  await page.locator('.help summary').first().focus();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#feeding-help')).toBeHidden();
+  await page.getByRole('button', {name: 'Next feed', exact: true}).click();
+  const next = await state(page);
+  expect(next.frames[0].events.some((e: any) => e.type === 'first_feed')).toBeTruthy();
+  await expect(page.locator('#feed-events')).toContainText('fed');
+  await expect(page.locator('#play')).toHaveAttribute('aria-label', 'Play replay');
+  await page.getByRole('button', {name: '100% fed', exact: true}).click();
+  const end = await state(page);
+  expect(end.frames[0].fed).toBe(end.frames[0].first_feed.length);
+  await expect(page.locator('#cycle-state')).toContainText('Round complete');
+  await expect(page.locator('#coverage')).toHaveAttribute('value', '100');
+  await expect(page.locator('#next-feed')).toBeDisabled();
+  await page.getByText('Where these data come from', {exact: true}).click();
+  await expect(page.locator('#provenance')).toContainText('ED_FL_3nests1noC2.csv');
+  await expect(page.locator('#scenario-context')).toContainText('97 recorded rows');
+  await page.getByRole('button', {name: 'Restart', exact: true}).click();
+  expect((await state(page)).tick).toBe(0);
+});
+
+test('context mismatch cannot display unverified feeding completion', async ({page}) => {
+  await page.route('**/scenario-context.json', async route => {
+    const response = await route.fetch();
+    const context = await response.json();
+    context.scenarios['v14-S08'].scaled_larvae = 69;
+    await route.fulfill({json: context});
+  });
+  await page.goto('/');
+  await expect(page.locator('#status')).toContainText('Dataset context does not match');
+  expect((await state(page)).frames).toEqual([]);
+  await expect(page.locator('#next-feed')).toBeDisabled();
+  await expect(page.locator('#coverage')).toHaveAttribute('value', '0');
+  await page.locator('#scenario').selectOption('v72-S07');
+  await expect(page.locator('#status')).toBeHidden();
+  await expect(page.locator('.view-label')).toHaveCount(1);
+});
+
+test('each method filter reaches its recorded end without extra views', async ({page}) => {
+  await ready(page, '/?scenario=v87-S06');
+  for (const method of ['tsp', 'biased', 'random', 'greedy', 'local_nearest', 'local_urgency_claims']) {
+    await page.locator(`[data-method="${method}"]`).click();
+    await expect(page.locator('#status')).toBeHidden();
+    await expect(page.locator(`[data-method="${method}"]`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.view-label')).toHaveCount(1);
+    await page.getByRole('button', {name: '100% fed', exact: true}).click();
+    const end = await state(page);
+    expect(end.frames[0].fed).toBe(134);
+    expect(end.frames[0].tick).toBe(end.tick);
+    await expect(page.locator('#remaining')).toContainText('0 waiting');
+  }
+});
 test("recorded playback, seek and inspector retain camera / hidden pin", async ({
   page,
 }) => {
@@ -26,6 +91,7 @@ test("recorded playback, seek and inspector retain camera / hidden pin", async (
     "data-position",
     seeking.frames[0].positions[0].join(","),
   );
+  await page.locator('#layer-controls summary').click();
   await page.locator("[data-layer=wasps]").uncheck();
   await expect(page.locator("#details")).toContainText("layer is hidden");
   expect((await state(page)).selected.index).toBe(0);
@@ -76,6 +142,7 @@ test("fallback preserves layer controls, playback and inspection", async ({
   await expect(page.locator("#top")).toBeDisabled();
   await page.locator("#entity").selectOption("larva:0");
   await expect(page.locator("#details")).toContainText("Initial hunger");
+  await page.locator('#layer-controls summary').click();
   await page.locator("[data-layer=larvae]").uncheck();
   await expect(page.locator("#details")).toContainText("layer is hidden");
   await page.locator("#seek").fill("10");
