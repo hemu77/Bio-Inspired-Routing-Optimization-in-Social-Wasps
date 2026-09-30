@@ -5,22 +5,25 @@ import nbformat as nbf
 
 ROOT = Path(__file__).parent
 report = json.loads((ROOT / "research_results.json").read_text())
-captions = json.loads((ROOT / "figures/research-v2/captions.json").read_text())
+captions = json.loads((ROOT / "figures/research-v3/captions.json").read_text())
 LIVE = "https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/"
 cells = []
 def markdown(text): cells.append(nbf.v4.new_markdown_cell(text))
 def code(text): cells.append(nbf.v4.new_code_cell(text))
 
 markdown("""# Social Wasps: Routing Under Local Information
-## Research-v2 / all nests, all bouts, paired experiments
+## Research-v3 / repeated feeding, all nests, all bouts
 
 I study how worker movement rules affect the time and travel needed to give every
-larva a first feed. The biological data supplies nest layouts and bout resource
+larva enough feeds to reach an explicit hunger threshold. The data supplies nest layouts and bout worker
 counts; the simulation is a controlled synthetic experiment, not a reconstruction
 of observed worker trajectories. This report covers v14, v72 and v87.
 
-**Read the endpoint carefully:** `served` means at least one feed. I do not infer
-satiation, metabolic energy, starvation or biologically realistic feeding cycles.
+**Read the endpoint carefully:** `served` means remaining hunger is at most 0.12.
+One feed may not be enough. I removed the original three-feed cap: feed count
+alone never means full. The inherited growth and portion sizes remain model
+assumptions, not calibrated physiology, food mass or measured biological satiation.
+The first-feed v2 report is archived under the `research-v2-first-feed` Git tag.
 The previous report is preserved in `final_analysis.ipynb` and the `legacy-v1` Git
 tag. Its numerical rankings are not directly comparable with this revised model.
 """)
@@ -59,7 +62,7 @@ display(inventory)
 markdown("""## 2. What The Data Contributes
 `ED_FL_3nests1noC2.csv` supplies cell positions, cell contents and stages.
 `ALL_FL_minmaj_final3noC2.csv` supplies nest-bout records and worker counts. I keep
-the existing event-code grouping (`FL`, `FL2`, `LPL`, `SPL`) for the resource rule;
+the existing event-code grouping (`FL`, `FL2`, `LPL`, `SPL`) for the worker-count rule;
 without a validated codebook, these counts are **assumed activity proxies**, not
 independent evidence of simulated feeding success.
 
@@ -84,9 +87,12 @@ additional larvae are synthetic and the quantized positions are not raw biologic
 coordinates. The grids are 22, 25 and 28 cells wide for v14, v72 and v87.
 
 Initial hunger is drawn independently from stage ranges: L1 `[0.20,0.50]`, L2
-`[0.45,0.75]`, L3 `[0.65,1.00]`. It stays fixed as a priority score; `FL_freq` never
-sets it. Replicate seeds vary these assumed priorities while every strategy inside
-a scenario-replicate receives the same colony and resources.
+`[0.45,0.75]`, L3 `[0.65,1.00]`. `FL_freq` never sets it. Before each tick, hungry
+larvae gain L1 0.020, L2 0.028 or L3 0.035 hunger, capped at 1. Each feed subtracts
+L1 0.35, L2 0.45 or L3 0.55, floored at 0. Once hunger reaches 0.12 or less, a larva
+is full for this single round and stops recovering hunger. A new cycle is not modeled.
+Replicate seeds vary initial hunger while every strategy inside a scenario-replicate
+receives identical initial hunger, colony, staffing and scheduler seeds.
 
 The retained resource formula is `max(ceil(larvae/5), observed workers) +
 ceil(grouped activity events/100)`. All simulated workers can feed; food supply and
@@ -94,22 +100,22 @@ foraging trips are deliberately outside this experiment. Background cells are
 traversable, not imaginary obstacles.
 """)
 markdown("""## 4. Agents And Fair Actions
-A larva records the first tick on which it is served. A worker has one action per
-tick: one cardinal grid move, one first feed, or one claim broadcast. Feeding and
+A larva records first-feed time, every feed and hunger-threshold completion time.
+A worker has one action per tick: one cardinal grid move, one feed, or one claim broadcast. Feeding and
 broadcasting therefore replace movement rather than occurring for free.
 
 Random activation uses a separate random stream from policy choices. The activation
 permutations remain paired across strategies, so a strategy's extra random draws
-cannot change the scheduler. A run stops at complete first-feed coverage or its
+cannot change the scheduler. A run stops when all larvae reach the hunger threshold or its
 horizon. Timeout is recorded as `completion_step=None`, never as a completed run.
 """)
 code("""policy_table = pd.DataFrame([
     ('random', 'Blind', 'Independent cardinal walk'),
     ('biased', 'Blind', 'Persistent direction; 25% chance to redraw'),
-    ('greedy', 'Global', 'Random target weighted by initial priority / (1 + distance)'),
+    ('greedy', 'Global', 'Random target weighted by remaining hunger / (1 + distance)'),
     ('tsp', 'Global', 'Nearest-neighbour tour; historical alias, not optimal TSP'),
     ('local_nearest', 'Local', 'Observed / remembered nearest target; exploration otherwise'),
-    ('local_urgency_claims', 'Local', 'Observed priority / (1 + distance), with expiring local claims')
+    ('local_urgency_claims', 'Local', 'Observed remaining hunger / (1 + distance), with expiring local claims')
 ], columns=['strategy', 'information', 'rule'])
 display(policy_table)
 """)
@@ -155,8 +161,8 @@ linked live lab for playback. Local Jupyter permits the interactive embeds.
 manifest = json.loads((ROOT / "web/public/manifest.json").read_text())
 representative = next(s["id"] for s in manifest["scenarios"] if s["nest"] == "v87")
 for strategy in ["tsp", "biased", "random", "greedy"]:
-    markdown(f"### {strategy}: recorded first-feed replay\n[Open interactive replay]({LIVE}?scenario={representative}&strategy={strategy})")
-    code(f"display(HTML('<iframe title=\"{strategy} first-feed replay\" src=\"{LIVE}?scenario={representative}&strategy={strategy}\" width=\"100%\" height=\"780\" loading=\"lazy\" style=\"border:1px solid #ccc\"></iframe>'))")
+    markdown(f"### {strategy}: recorded hunger-based feeding round\n[Open interactive replay]({LIVE}?scenario={representative}&strategy={strategy})")
+    code(f"display(HTML('<iframe title=\"{strategy} hunger-based replay\" src=\"{LIVE}?scenario={representative}&strategy={strategy}\" width=\"100%\" height=\"780\" loading=\"lazy\" style=\"border:1px solid #ccc\"></iframe>'))")
 markdown("""## 7. Six Analysis Questions
 These plots replace the unsupported composite difficulty score and redundant
 four-point frontier. The coverage band summarizes replicate-level means across
@@ -166,12 +172,12 @@ confidence interval. Waiting measures are explicitly restricted when censored.
 code("captions = generate_report(report)\nassert len(captions) == 6")
 for i, caption in enumerate(captions):
     markdown(f"### 7.{i + 1}. {caption['title']}")
-    code(f"display(Image(filename='figures/research-v2/{caption['file']}'))")
+    code(f"display(Image(filename='figures/research-v3/{caption['file']}'))")
     code(f"display(Markdown(captions[{i}]['interpretation']))")
 markdown("""## 8. Conclusions And Limits
-The local nearest rule is faster here, while urgency with claims trades some speed
-for lower travel. Explicit communication cost matters: claims are not automatically
-an improvement. The ablation helps separate the effect of priority, coordination
+Read the newly executed ranking rather than transferring conclusions from v2.
+Explicit communication cost matters: claims are not automatically an improvement.
+The ablation helps separate the effect of hunger prioritization, coordination
 and information access rather than calling a visually appealing policy 'best'.
 
 Only three real nest layouts are available; doubling larvae is synthetic. The
@@ -196,5 +202,5 @@ print('Best ranked strategy:', ranking.iloc[0].strategy, '| still incomplete:', 
 print('GREEN: all validation checks passed. Read the limitations before interpreting results.')
 """)
 nb = nbf.v4.new_notebook(cells=cells, metadata={"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}})
-nbf.write(nb, ROOT / "final_analysis_v2.ipynb")
-print("Created final_analysis_v2.ipynb")
+nbf.write(nb, ROOT / "final_analysis_v3.ipynb")
+print("Created final_analysis_v3.ipynb")

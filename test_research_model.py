@@ -5,6 +5,31 @@ from research_model import ResearchModel, run_model
 
 
 class ResearchChecks(unittest.TestCase):
+    def test_partial_feed_and_no_three_feed_cap(self):
+        m = ResearchModel([(2, 2)], [1.0], ['L1'], 5, 1, 42, 'random')
+        for visit in range(3):
+            m.positions[:] = [2, 2]
+            m.step()
+            self.assertAlmostEqual(m.hunger[0], .65)
+            self.assertEqual(m.snapshot()['fed'], 0)
+            if visit < 2:
+                m.positions[:] = [0, 0]
+                for _ in range(25):
+                    # Isolate hunger recovery between visits; prevent accidental feeding.
+                    m.positions[:] = [0, 0]
+                    m.step()
+        self.assertEqual(m.feed_counts[0], 3)
+        self.assertEqual(m.satiated_at[0], -1)
+        m.positions[:] = [2, 2]
+        m.step(); m.step()
+        self.assertLessEqual(m.hunger[0], .12)
+        self.assertEqual(m.snapshot()['fed'], 1)
+        final_hunger = m.hunger.copy()
+        feeds = m.feed_counts.copy()
+        m.step()
+        self.assertTrue(np.array_equal(m.hunger, final_hunger))
+        self.assertTrue(np.array_equal(m.feed_counts, feeds))
+
     def model(self, strategy="greedy", seed=42, **kwargs):
         return ResearchModel([(0, 0), (4, 4), (2, 1)], [.3, .7, .9],
                              ["L1", "L2", "L3"], 5, 3, seed, strategy, **kwargs)
@@ -16,9 +41,10 @@ class ResearchChecks(unittest.TestCase):
             for _ in range(100):
                 model.step()
                 self.assertTrue((np.abs(model.positions - previous).sum(axis=1) <= 1).all())
-                self.assertTrue((model.feed_counts <= 1).all())
+                self.assertTrue(((model.hunger >= 0) & (model.hunger <= 1)).all())
+                self.assertTrue((model.hunger[model.satiated_at >= 0] <= .12).all())
                 previous = model.positions.copy()
-            self.assertTrue(np.array_equal(model.hunger, [.3, .7, .9]))
+            self.assertTrue(np.array_equal(model.initial_hunger, [.3, .7, .9]))
 
     def test_scheduler_independent_of_policy(self):
         a, b = self.model("random"), self.model("tsp")

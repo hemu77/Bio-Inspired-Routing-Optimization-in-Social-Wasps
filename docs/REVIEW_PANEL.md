@@ -1,4 +1,8 @@
-# Two-Reviewer Handover
+# Research-v2 Review (Archived)
+
+This review applies to the `research-v2-first-feed` tag only. Current v3 changes
+the feeding endpoint by explicit user request; see `ACCEPTANCE.md` and the new
+README for active behavior and evidence. The observations below remain historical.
 
 Reviewed 2026-09-30 by two independent, read-only agent lanes: scientific fidelity and visual/interaction correctness. These are tool-assisted reviews, not external biological peer review or a claim of human professional credentials.
 

@@ -1,0 +1,32 @@
+[
+  {
+    "file": "01_coverage.png",
+    "title": "How quickly does each policy reach the whole colony?",
+    "interpretation": "Each line averages all 36 scenarios; shading is the 10th-90th percentile of ten replicate-level means, not a biological confidence interval. Finished runs hold at 100% through tick 3000. Local urgency + claims ranks first by reliability, then median capped time, then movement per served larva; the local/global information distinction prevents a causal claim about routing alone."
+  },
+  {
+    "file": "02_reliability.png",
+    "title": "All policies finish; completion speed still differs",
+    "interpretation": "The left panel reports completion frequency over 360 runs per strategy. The right includes every run: an unfinished run contributes the fair horizon, never a fabricated completion tick. This is horizon-capped time, not an estimate of uncensored completion time; medians alone can hide the slow tail."
+  },
+  {
+    "file": "03_movement.png",
+    "title": "How much movement buys one fully served larva?",
+    "interpretation": "Lower values mean less grid travel per served larva. Boxplots show all scenario-replicate runs rather than just four aggregate points. Read this with the reliability panel: a policy that serves fewer larvae is not automatically preferable because it moves less; distance is a computational proxy, not measured metabolic energy."
+  },
+  {
+    "file": "04_waiting.png",
+    "title": "Does efficient routing leave larvae waiting?",
+    "interpretation": "Each larva's wait starts at tick zero and ends when its remaining hunger reaches 0.12 or less; unfinished larvae are censored at 3000. The left measures the long-waiting tail, while the right weights waits by randomly assigned initial hunger, not terminal hunger. These are model-threshold waiting metrics, not evidence of physiological starvation or measured welfare."
+  },
+  {
+    "file": "05_scenarios.png",
+    "title": "Does the result survive every nest and bout?",
+    "interpretation": "Rows retain all 36 scenarios, grouped into v14, v72 and v87; columns use one shared color scale. Numbers are medians over ten matched replicates, and an asterisk indicates at least one unfinished run. These scenarios reuse a nest's synthetic layout and differ in worker resources and seeds; they are not 36 independent biological colonies."
+  },
+  {
+    "file": "06_coordination.png",
+    "title": "Is communication worth its action cost?",
+    "interpretation": "The same 36 scenarios and ten seeds are paired across all four configurations; each box summarizes ten replicate-level medians. Claim broadcasts consume a tick instead of movement or feeding, and packets count separately from distance. Local claims have median capped time 74 versus 76 without claims; this result is reported even if coordination is slower. The global-sensing ablation changes information access, not the observed nest geometry."
+  }
+]

@@ -1,4 +1,4 @@
-"""Research-v2: first-feed routing, not an inferred physiology model.
+"""Research-v3: repeat feeding until an explicit hunger threshold is reached.
 
 The legacy engine remains untouched. All notebook, benchmark and replay paths
 use this engine; the browser only reads its recorded states.
@@ -10,7 +10,10 @@ import json
 from pathlib import Path
 import numpy as np
 
-VERSION = "research-v2"
+VERSION = "research-v3"
+SATIATION_THRESHOLD = 0.12
+HUNGER_GROWTH = {"L1": 0.020, "L2": 0.028, "L3": 0.035}
+FEED_DROP = {"L1": 0.35, "L2": 0.45, "L3": 0.55}
 STRATEGIES = ("random", "biased", "greedy", "tsp", "local_nearest", "local_urgency_claims")
 MOVES = np.array([(1, 0), (-1, 0), (0, 1), (0, -1)])
 
@@ -19,7 +22,8 @@ class ResearchModel:
     def __init__(self, larvae, hunger, stages, grid_size, n_wasps, seed, strategy,
                  claims_enabled=True, global_sensing=False):
         self.larvae = np.asarray(larvae, dtype=int)
-        self.hunger = np.asarray(hunger, dtype=float)
+        self.hunger = np.asarray(hunger, dtype=float).copy()
+        self.initial_hunger = self.hunger.copy()
         self.stages = list(stages)
         if (self.larvae.ndim != 2 or self.larvae.shape[1] != 2 or
                 len(self.larvae) != len(self.hunger) or not len(self.larvae) or
@@ -28,7 +32,7 @@ class ResearchModel:
                 ((self.hunger < 0) | (self.hunger > 1)).any() or
                 ((self.larvae < 0) | (self.larvae >= grid_size)).any() or
                 len(set(map(tuple, self.larvae))) != len(self.larvae) or
-                strategy not in STRATEGIES):
+                strategy not in STRATEGIES or any(s not in FEED_DROP for s in stages)):
             raise ValueError("Invalid colony, grid, resources or strategy")
         self.size, self.n_wasps, self.seed = int(grid_size), int(n_wasps), int(seed)
         self.strategy = strategy
@@ -42,6 +46,9 @@ class ResearchModel:
         self.positions = np.clip(self.size // 2 + offsets[np.arange(n_wasps) % 9], 0, self.size - 1)
         self.directions = init_rng.integers(0, 4, n_wasps)
         self.first_feed = np.full(len(larvae), -1, dtype=int)
+        self.satiated_at = np.where(self.hunger <= SATIATION_THRESHOLD, 0, -1)
+        self.growth = np.array([HUNGER_GROWTH[s] for s in stages])
+        self.portions = np.array([FEED_DROP[s] for s in stages])
         self.feed_counts = np.zeros(len(larvae), dtype=int)
         self.distance = np.zeros(n_wasps, dtype=int)
         self.target = np.full(n_wasps, -1, dtype=int)
@@ -79,7 +86,7 @@ class ResearchModel:
         seen = np.flatnonzero(np.abs(self.larvae - self.positions[worker]).sum(axis=1) <= radius)
         memory = self.memory[worker]
         for larva in seen:
-            memory[int(larva)] = (tuple(self.larvae[larva]), bool(self.first_feed[larva] >= 0), float(self.hunger[larva]))
+            memory[int(larva)] = (tuple(self.larvae[larva]), bool(self.satiated_at[larva] >= 0), float(self.hunger[larva]))
         # Insertion-ordered bounded memory: no omniscient completion lookup.
         while len(memory) > 256:
             del memory[next(iter(memory))]
@@ -106,7 +113,7 @@ class ResearchModel:
             if self.tick % 4 == 0 or self.target[worker] != chosen:
                 self.broadcast(worker, chosen, self.tick + 8)
             return chosen
-        remaining = np.flatnonzero(self.first_feed < 0)
+        remaining = np.flatnonzero(self.satiated_at < 0)
         if not len(remaining):
             return -1
         if strategy == "tsp":
@@ -119,7 +126,7 @@ class ResearchModel:
                     nearest = min(left, key=lambda i: (int(np.abs(self.larvae[i] - current).sum()), i))
                     queue.append(nearest); left.remove(nearest)
                     current = self.larvae[nearest]
-            while queue and self.first_feed[queue[0]] >= 0:
+            while queue and self.satiated_at[queue[0]] >= 0:
                 queue.pop(0)
             return queue[0] if queue else -1
         distances = np.abs(self.larvae[remaining] - self.positions[worker]).sum(axis=1)
@@ -128,6 +135,8 @@ class ResearchModel:
 
     def step(self):
         self.tick += 1
+        active = self.satiated_at < 0
+        self.hunger[active] = np.minimum(1.0, self.hunger[active] + self.growth[active])
         self.events = []
         self.expire_claims()
         self.last_order = self.scheduler.permutation(self.n_wasps).tolist()
@@ -135,12 +144,20 @@ class ResearchModel:
             self.broadcast_this_action = False
             pos = self.positions[worker]
             larva = self.cell_larva.get(tuple(pos))
-            if larva is not None and self.first_feed[larva] < 0:
-                self.first_feed[larva] = self.tick
+            if larva is not None and self.satiated_at[larva] < 0:
+                first = self.first_feed[larva] < 0
+                if first:
+                    self.first_feed[larva] = self.tick
+                before = float(self.hunger[larva])
+                self.hunger[larva] = max(0.0, before - self.portions[larva])
+                if self.hunger[larva] <= SATIATION_THRESHOLD:
+                    self.satiated_at[larva] = self.tick
                 self.feed_counts[larva] += 1
-                self.memory[worker][larva] = (tuple(pos), True, float(self.hunger[larva]))
-                self.events.append({"type": "first_feed", "worker": worker, "larva": larva})
-                self.reason[worker] = "first feed; no movement this tick"
+                self.memory[worker][larva] = (tuple(pos), bool(self.satiated_at[larva] >= 0), float(self.hunger[larva]))
+                self.events.append({"type": "first_feed" if first else "feed", "worker": worker,
+                                    "larva": larva, "hunger_before": before,
+                                    "hunger_after": float(self.hunger[larva])})
+                self.reason[worker] = "feed; no movement this tick"
                 self.target[worker] = larva
                 continue
             target = self.choose_target(worker)
@@ -174,10 +191,12 @@ class ResearchModel:
             self.visits[worker, *new] += 1
 
     def snapshot(self):
-        return {"tick": self.tick, "fed": int((self.first_feed >= 0).sum()),
+        return {"tick": self.tick, "fed": int((self.satiated_at >= 0).sum()),
                 "phase": "post_tick", "worker_order": list(self.last_order), "events": list(self.events),
                 "distance": int(self.distance.sum()), "messages": self.messages,
                 "first_feed": self.first_feed.tolist(), "positions": self.positions.tolist(),
+                "hunger": self.hunger.tolist(), "feed_counts": self.feed_counts.tolist(),
+                "satiated_at": self.satiated_at.tolist(),
                 "targets": self.target.tolist(), "reasons": list(self.reason),
                 "claims": [[[int(k), int(v[0]), int(v[1])] for k, v in claims.items()]
                            for claims in self.claims]}
@@ -188,14 +207,14 @@ def run_model(model, horizon=3000, trace=False):
         raise ValueError("Horizon must be positive")
     records = [model.snapshot()] if trace else []
     curves = []
-    while model.tick < horizon and (model.first_feed < 0).any():
+    while model.tick < horizon and (model.satiated_at < 0).any():
         model.step()
         if trace:
             records.append(model.snapshot())
-        curves.append({"step": model.tick, "coverage": float((model.first_feed >= 0).mean()),
+        curves.append({"step": model.tick, "coverage": float((model.satiated_at >= 0).mean()),
                        "distance": int(model.distance.sum()), "messages": model.messages})
-    served = model.first_feed >= 0
-    waits = np.where(served, model.first_feed, model.tick)
+    served = model.satiated_at >= 0
+    waits = np.where(served, model.satiated_at, model.tick)
     finished = bool(served.all())
     summary = {"model_version": VERSION, "strategy": model.strategy,
                "seed": model.seed, "finished": finished,
@@ -206,9 +225,10 @@ def run_model(model, horizon=3000, trace=False):
                "distance_per_served": float(model.distance.sum() / served.sum()) if served.any() else None,
                "restricted_p95_wait": float(np.percentile(waits, 95)),
                "restricted_max_wait": int(waits.max()),
-               "priority_weighted_wait": float(np.average(waits, weights=model.hunger)),
+               "priority_weighted_wait": float(np.average(waits, weights=np.maximum(model.initial_hunger, 1e-9))),
+               "total_feeds": int(model.feed_counts.sum()), "final_avg_hunger": float(model.hunger.mean()),
                "messages": model.messages, "n_wasps": model.n_wasps, "grid_size": model.size}
-    curves.insert(0, {"step": 0, "coverage": 0.0})
+    curves.insert(0, {"step": 0, "coverage": float((model.initial_hunger <= SATIATION_THRESHOLD).mean())})
     if not curves or curves[-1]["step"] != model.tick:
         curves.append({"step": model.tick, "coverage": float(served.mean())})
     return summary, curves, records
@@ -222,11 +242,13 @@ def source_checksum():
 
 
 def trace_payload(model, summary, frames, scenario):
-    return {"schema_version": 1, "model_version": VERSION, "source_checksum": source_checksum(),
+    return {"schema_version": 2, "model_version": VERSION, "source_checksum": source_checksum(),
+            "satiation_threshold": SATIATION_THRESHOLD,
+            "hunger_growth": HUNGER_GROWTH, "feed_drop": FEED_DROP,
             "scenario": scenario, "strategy": model.strategy, "seed": model.seed,
             "grid_size": model.size, "sensing_radius": 3, "communication_radius": 3,
             "claims_enabled": model.claims_enabled, "global_sensing": model.global_sensing,
             "depth_is_illustrative": True, "summary": summary,
             "larvae": [{"id": f"L{i + 1:03}", "xy": xy.tolist(), "stage": model.stages[i],
-                        "hunger": float(model.hunger[i])} for i, xy in enumerate(model.larvae)],
+                        "hunger": float(model.initial_hunger[i])} for i, xy in enumerate(model.larvae)],
             "workers": [f"W{i + 1:03}" for i in range(model.n_wasps)], "frames": frames}

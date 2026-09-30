@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import wasp_routing_analysis as legacy
-from research_model import ResearchModel, STRATEGIES, run_model, source_checksum, trace_payload
+from research_model import ResearchModel, STRATEGIES, VERSION, run_model, source_checksum, trace_payload
 
 
 def write_json(path, value):
@@ -54,8 +54,8 @@ def run_experiments(replicates=10, smoke=False, export_traces=True):
     inventory, scenarios, geometry = prepare()
     selected = scenarios.groupby("nest", sort=False).head(1) if smoke else scenarios
     fingerprint = hashlib.sha256((source_checksum() + json.dumps(geometry, sort_keys=True) +
-                                  scenarios.to_json() + ":3000:10000:v2").encode()).hexdigest()
-    checkpoint = Path("outputs/research-v2/checkpoints") / fingerprint
+                                  scenarios.to_json() + ":3000:10000:" + VERSION).encode()).hexdigest()
+    checkpoint = Path("outputs") / VERSION / "checkpoints" / fingerprint
     summaries, curves, extended = [], [], []
     started = time.perf_counter()
     tasks = [(s, "main") for s in STRATEGIES]
@@ -97,7 +97,7 @@ def run_experiments(replicates=10, smoke=False, export_traces=True):
                                    ascending=[False, True, True])
     public_columns = ["public_id", "nest", "observed_rows", "observed_feeding_events",
                       "observed_unique_cells", "observed_unique_wasps", "scaled_larvae", "grid_size", "n_wasps"]
-    report = {"model_version": "research-v2", "source_checksum": source_checksum(),
+    report = {"model_version": VERSION, "source_checksum": source_checksum(),
               "fingerprint": fingerprint, "replicates": replicates, "fair_horizon": 3000,
               "extended_horizon": 10000, "inventory": inventory.to_dict("records"),
               "scenarios": scenarios[public_columns].to_dict("records"), "runs": summaries,
@@ -123,7 +123,7 @@ def export_selected_traces(report, scenarios, geometry):
                              ascending=[True, False, True]).iloc[0]
     if worst.scenario not in representatives:
         representatives.append(worst.scenario)
-    manifest = {"model_version": "research-v2", "source_checksum": source_checksum(), "scenarios": []}
+    manifest = {"model_version": VERSION, "source_checksum": source_checksum(), "scenarios": []}
     for scenario in representatives:
         row = next(r for r in scenarios.itertuples(index=False) if r.public_id == scenario)
         entry = {"id": scenario, "nest": row.nest, "label": "slowest / incomplete example" if scenario == worst.scenario else "median tour example",

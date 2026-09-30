@@ -7,6 +7,9 @@ export type Frame = {
   positions: XY[];
   targets: number[];
   first_feed: number[];
+  satiated_at: number[];
+  hunger: number[];
+  feed_counts: number[];
   reasons: string[];
   claims: number[][][];
   worker_order: number[];
@@ -29,6 +32,9 @@ export type Trace = {
   workers: string[];
   frames: Frame[];
   background_cells: XY[];
+  satiation_threshold: number;
+  hunger_growth: Record<string, number>;
+  feed_drop: Record<string, number>;
   summary: {
     finished: boolean;
     completion_step: number | null;
@@ -57,7 +63,8 @@ export const labels: Record<string, string> = {
 export function validateTrace(t: Trace, manifest: Manifest): Trace {
   const integer = (v: number) => Number.isInteger(v);
   if (
-    t.schema_version !== 1 ||
+    t.schema_version !== 2 ||
+    t.satiation_threshold !== 0.12 ||
     t.model_version !== manifest.model_version ||
     t.source_checksum !== manifest.source_checksum ||
     !labels[t.strategy] ||
@@ -74,14 +81,18 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
     throw Error("Unsupported or invalid replay");
   const xy = (p: XY) =>
     p.length === 2 && p.every((v) => integer(v) && v >= 0 && v < t.grid_size);
+  const hungerRanges: Record<string, [number, number]> = {L1:[.2,.5], L2:[.45,.75], L3:[.65,1]};
+  for (const [stage,growth,drop] of [['L1',.020,.35],['L2',.028,.45],['L3',.035,.55]] as const)
+    if (t.hunger_growth?.[stage] !== growth || t.feed_drop?.[stage] !== drop)
+      throw Error('Unsupported hunger rules');
   if (
     t.larvae.some(
       (l) =>
         !xy(l.xy) ||
         !Number.isFinite(l.hunger) ||
-        l.hunger < 0 ||
-        l.hunger > 1 ||
-        !["L1", "L2", "L3"].includes(l.stage),
+        !hungerRanges[l.stage] ||
+        l.hunger < hungerRanges[l.stage][0] ||
+        l.hunger > hungerRanges[l.stage][1],
     )
   )
     throw Error("Invalid larval state");
@@ -93,9 +104,15 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
       f.targets.length !== t.workers.length ||
       f.reasons.length !== t.workers.length ||
       f.first_feed.length !== t.larvae.length ||
+      f.satiated_at.length !== t.larvae.length ||
+      f.hunger.length !== t.larvae.length ||
+      f.feed_counts.length !== t.larvae.length ||
+      f.hunger.some(v => !Number.isFinite(v) || v < 0 || v > 1) ||
+      f.feed_counts.some(v => !integer(v) || v < 0) ||
+      f.satiated_at.some((v,l) => !integer(v) || v < -1 || v > i || (v >= 0) !== (f.hunger[l] <= t.satiation_threshold)) ||
       f.positions.some((p) => !xy(p)) ||
       f.first_feed.some((v) => !integer(v) || v < -1 || v > i) ||
-      f.fed !== f.first_feed.filter((v) => v >= 0).length ||
+      f.fed !== f.satiated_at.filter((v) => v >= 0).length ||
       f.targets.some((v) => !integer(v) || v < -1 || v >= t.larvae.length)
     )
       throw Error(`Invalid replay frame ${i}`);
@@ -134,7 +151,10 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
       if (
         f.worker_order.length ||
         f.events.length ||
-        f.fed ||
+        f.feed_counts.some(v => v !== 0) ||
+        f.first_feed.some(v => v !== -1) ||
+        f.satiated_at.some(v => v !== -1) ||
+        f.hunger.some((v,l) => v !== t.larvae[l].hunger) ||
         f.distance ||
         f.messages
       )
@@ -142,6 +162,8 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
       return;
     }
     const previous = t.frames[i - 1];
+    const hunger = previous.hunger.map((h,l) => previous.satiated_at[l] >= 0 ? h : Math.min(1, h + t.hunger_growth[t.larvae[l].stage]));
+    const counts = [...previous.feed_counts], full = [...previous.satiated_at];
     if (
       f.worker_order.length !== t.workers.length ||
       new Set(f.worker_order).size !== t.workers.length ||
@@ -169,19 +191,26 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
         f.positions[worker].some((v, a) => v !== previous.positions[worker][a])
       )
         throw Error("Feed or broadcast also moved");
-      if (event.type === "first_feed") {
+      if (event.type === "first_feed" || event.type === "feed") {
         const larva = event.larva as number;
         if (
           !integer(larva) ||
           larva < 0 ||
           larva >= t.larvae.length ||
-          fedEvents.has(larva) ||
-          previous.first_feed[larva] >= 0 ||
-          f.first_feed[larva] !== i ||
+          full[larva] >= 0 ||
           t.larvae[larva].xy.some((v, a) => v !== previous.positions[worker][a])
         )
-          throw Error("Invalid first-feed event");
-        fedEvents.add(larva);
+          throw Error("Invalid feeding event");
+        if (event.type === 'first_feed') {
+          if (fedEvents.has(larva) || previous.first_feed[larva] >= 0 || f.first_feed[larva] !== i)
+            throw Error('Invalid first-feed event');
+          fedEvents.add(larva);
+        } else if (previous.first_feed[larva] < 0 && !fedEvents.has(larva)) throw Error('Repeat feed before first feed');
+        if (!Number.isFinite(event.hunger_before) || Math.abs(Number(event.hunger_before) - hunger[larva]) > 1e-9) throw Error('Invalid hunger before feed');
+        hunger[larva] = Math.max(0, hunger[larva] - t.feed_drop[t.larvae[larva].stage]);
+        if (!Number.isFinite(event.hunger_after) || Math.abs(Number(event.hunger_after) - hunger[larva]) > 1e-9) throw Error('Invalid hunger after feed');
+        counts[larva]++;
+        if (hunger[larva] <= t.satiation_threshold) full[larva] = i;
       } else if (event.type === "broadcast") {
         broadcasts++;
         if (
@@ -200,6 +229,9 @@ export function validateTrace(t: Trace, manifest: Manifest): Trace {
       )
         throw Error("Unexplained feeding transition");
     });
+    if (f.hunger.some((v,l) => !Number.isFinite(hunger[l]) || Math.abs(v-hunger[l]) > 1e-9) ||
+        f.feed_counts.some((v,l) => v !== counts[l]) || f.satiated_at.some((v,l) => v !== full[l]))
+      throw Error('Unexplained hunger or satiation transition');
     const movement = f.positions.reduce(
       (sum, p, w) =>
         sum +

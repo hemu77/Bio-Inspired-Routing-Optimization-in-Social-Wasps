@@ -1,5 +1,5 @@
 import "./style.css";
-import { ReplayScene, Entity, replayColors } from "./scene";
+import { ReplayScene, Entity, replayThemes } from "./scene";
 import { Manifest, Trace, labels, loadTrace, frameAt } from "./trace";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -13,11 +13,10 @@ const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 // Playback stays in document flow, never over the lower comparison panels.
 document.querySelector("main")!.before(document.querySelector("footer")!);
-for (const [key, value] of Object.entries(replayColors)) document.documentElement.style.setProperty(`--replay-${key}`, value);
-document.querySelector("nav .compare")!.lastChild!.textContent = " Compare four v2 baselines";
+document.querySelector("nav .compare")!.lastChild!.textContent = " Compare four baselines";
 const modelNote = document.createElement("p");
 modelNote.className = "model-note";
-modelNote.textContent = "Research-v2: adapted TSP, Biased, Random and Greedy rules. Not the original notebook's trajectories or satiation model.";
+modelNote.textContent = "Research-v3: repeated feeds reduce remaining hunger. Full green means hunger ≤ 0.12; there is no three-feed cap. These rates are model assumptions, not measured physiology.";
 document.querySelector(".method-bar")!.prepend(modelNote);
 const reference = document.createElement("a");
 reference.id = "legacy-replay";
@@ -45,7 +44,7 @@ $("canvas").after(feedCaption);
 $("canvas").append($("view-labels"));
 const extensions = document.createElement("details");
 extensions.id = "extra-methods";
-extensions.innerHTML = '<summary>Research-v2 extensions (not original methods)</summary><div id="extension-filters"></div>';
+extensions.innerHTML = '<summary>Additional local-information methods</summary><div id="extension-filters"></div>';
 $("method-filters").after(extensions);
 const scenario = $<HTMLSelectElement>("scenario"),
   strategy = $<HTMLSelectElement>("strategy"),
@@ -55,6 +54,39 @@ const scene = new ReplayScene(
   $("canvas"),
   new URLSearchParams(location.search).has("2d"),
 );
+const themeButton = document.createElement('button');
+themeButton.id = 'theme-toggle';
+document.querySelector('nav')!.append(themeButton);
+let theme: keyof typeof replayThemes = 'dark';
+try { if (localStorage.getItem('nest-lab-theme') === 'light') theme = 'light'; } catch { /* Themes still work when storage is blocked. */ }
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+  scene.setTheme(theme);
+  for (const [key,value] of Object.entries(scene.palette)) document.documentElement.style.setProperty(`--replay-${key}`, value);
+  themeButton.textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+  themeButton.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+  themeButton.title = 'Change appearance without restarting or moving the camera';
+}
+themeButton.onclick = () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  try { localStorage.setItem('nest-lab-theme', theme); } catch { /* Optional preference persistence. */ }
+};
+applyTheme();
+document.querySelector('.legend .fed')!.parentElement!.lastChild!.textContent = 'Full (hunger ≤ 0.12)';
+const partialLegend = document.createElement('span');
+partialLegend.innerHTML = '<i class="partial"></i>Part-fed (hunger shade)';
+document.querySelector('.legend .fed')!.parentElement!.before(partialLegend);
+document.querySelector('.cycle-chart > span')!.textContent = 'Whole round: hunger-threshold completion';
+$('coverage').setAttribute('aria-label', 'Larvae reaching the hunger threshold');
+$('cycle-chart').setAttribute('aria-label', 'Recorded hunger-threshold completion over the whole round');
+$('next-feed').title = 'Jump to the next recorded feed, including repeat feeds';
+document.querySelector('#feeding-help')!.textContent = 'Blue means no feed yet. After feeding, blue-to-green shading follows remaining hunger. Solid green means hunger ≤ 0.12. Each feed reduces hunger by L1 0.35, L2 0.45 or L3 0.55; hungry larvae recover 0.020, 0.028 or 0.035 per tick. Full larvae stop recovering within this one round. These inherited rates are assumptions; three feeds do not automatically mean full.';
+scopeNote.textContent = 'Hunger-threshold completion, not measured physiological satiation.';
+$('progress-context').textContent = 'Hunger-based feeding round';
+document.querySelector('.layers > p')!.textContent = 'Workers may feed the same larva repeatedly until its remaining hunger reaches the threshold.';
+document.querySelector('#layer-controls > p:last-child')!.textContent = 'Drag to orbit. Shift-drag or right-drag to pan; two-finger drag on touch. Scroll to zoom at the pointer. Reset view fits the nest again.';
+document.querySelector('.inspector .help p')!.textContent = 'The chart counts larvae reaching hunger ≤ 0.12, not larvae merely visited once. Partial feeding can occur during flat stretches. A tick permits each worker one move, feed or broadcast; it is not seconds.';
 $("mode").textContent = scene.renderer
   ? "3D / XY preserved"
   : "2D fallback / no WebGL";
@@ -89,7 +121,7 @@ $<HTMLInputElement>("opacity").oninput = (e) => {
   scene.layers.opacity = Number((e.target as HTMLInputElement).value) / 100;
   scene.changed = true;
 };
-for (const [title, extended] of [["Adapted v2 baselines", false], ["Research-v2 extensions", true]] as const) {
+for (const [title, extended] of [["Adapted baselines", false], ["Local-information extensions", true]] as const) {
   const group = document.createElement("optgroup");
   group.label = title;
   for (const [value, label] of Object.entries(labels))
@@ -101,9 +133,9 @@ const methodDescriptions: Record<string, string> = {
   random: "No knowledge of larval locations. Each move chooses a random grid direction. A worker feeds when it happens to reach a waiting larva.",
   biased: "No knowledge of larval locations. Workers tend to keep moving in the same direction, with a 25% chance to redraw it each move.",
   tsp: "Knows the whole colony. Each worker follows a nearest-neighbour tour. This historical TSP label does not mean an optimal route.",
-  greedy: "Knows the whole colony. Chooses targets randomly, weighted toward higher initial stage-random priority and shorter distance; it is not a deterministic nearest-target rule.",
+  greedy: "Knows the whole colony. Chooses targets randomly, weighted toward greater remaining hunger and shorter distance; it is not a deterministic nearest-target rule.",
   local_nearest: "Sees nearby cells within three grid moves, and remembers observations. Chooses the nearest known waiting larva; explores when none is known.",
-  local_urgency_claims: "Sees nearby cells and remembers observations. Balances initial stage-random priority against distance, then broadcasts short-lived target claims to nearby workers. Communication consumes a turn.",
+  local_urgency_claims: "Sees nearby cells and remembers observations. Balances observed remaining hunger against distance, then broadcasts short-lived target claims to nearby workers. Communication consumes a turn.",
 };
 for (const [value, label] of Object.entries(labels)) {
   const button = document.createElement("button");
@@ -198,7 +230,7 @@ async function load() {
     reference.hidden = compare.checked || strategy.value.startsWith("local_");
     reference.href = `legacy/simulation_${strategy.value}.html`;
     $("method-name").textContent = compare.checked ? "Four baseline methods" : labels[strategy.value];
-    $("method-explanation").textContent = compare.checked ? "Same synthetic colony, assumed worker count and paired seed. Four adapted v2 policies share the same actual tick. Completed methods hold their last state. They are not the original notebook's feeding-cycle model." : methodDescriptions[strategy.value];
+    $("method-explanation").textContent = compare.checked ? "Same synthetic colony, worker count, hunger rules and paired seed. Completed methods hold their final state. This is research-v3, not the original notebook's action model." : methodDescriptions[strategy.value];
     $("canvas").style.visibility = "visible";
     updateLabels();
     updateInspector();
@@ -249,7 +281,7 @@ function updateLabels() {
     const title = document.createElement("strong"),
       line = document.createElement("span");
     title.textContent = labels[trace.strategy];
-    line.textContent = `${frame.fed}/${trace.larvae.length} fed / tick ${frame.tick}${frame.fed === trace.larvae.length ? " / COMPLETE" : ""}`;
+      line.textContent = `${frame.fed}/${trace.larvae.length} full / tick ${frame.tick}${frame.fed === trace.larvae.length ? " / COMPLETE" : ""}`;
     label.append(title, line);
     if (i === focused) label.classList.add("focused");
     host.append(label);
@@ -259,18 +291,19 @@ function updateLabels() {
   updateCycle();
 }
 
-// Presentation is derived only from stored first-feed events; no browser simulation.
+// Hunger and fullness come from Python snapshots, never a browser-side simulation.
 function updateCycle() {
   const trace = traces[focused];
   if (!trace) return;
   const frame = frameAt(trace, tick), total = trace.larvae.length;
   const complete = frame.fed === total;
   $("progress-context").textContent = `${trace.scenario} / ${labels[trace.strategy]}`;
-  $("cycle-state").textContent = complete ? "Round complete" : frame.fed ? "Feeding in progress" : "Searching for the first feed";
-  $("fed-count").textContent = `${frame.fed} / ${total} fed`;
+  $("cycle-state").textContent = complete ? "Round complete" : frame.feed_counts.some(n => n > 0) ? "Feeding in progress" : "Searching for the first feed";
+  $("fed-count").textContent = `${frame.fed} / ${total} full`;
   $<HTMLProgressElement>("coverage").value = frame.fed / total * 100;
-  $("remaining").textContent = `${total - frame.fed} waiting / ${(frame.fed / total * 100).toFixed(1)}% covered`;
-  $("run-summary").textContent = trace.summary.finished ? `This run finishes at tick ${trace.summary.completion_step}. Every larva receives one first feed.` : `Stopped at tick ${trace.summary.observed_steps}; coverage remains incomplete.`;
+  const partial = frame.feed_counts.filter((n,l) => n > 0 && frame.satiated_at[l] < 0).length;
+  $("remaining").textContent = `${total - frame.fed - partial} unfed / ${partial} part-fed / ${frame.fed} full`;
+  $("run-summary").textContent = trace.summary.finished ? `All larvae reach hunger ≤ 0.12 at tick ${trace.summary.completion_step}.` : `Stopped at tick ${trace.summary.observed_steps}; some larvae remain hungry.`;
   const lastTick = Math.max(1, trace.frames.at(-1)!.tick);
   document.getElementById("coverage-cursor")!.setAttribute("cx", String(4 + frame.tick / lastTick * 232));
   document.getElementById("coverage-cursor")!.setAttribute("cy", String(58 - frame.fed / total * 50));
@@ -299,9 +332,9 @@ function updateCycle() {
     }
   }
   let eventFrame = frame;
-  while (eventFrame.tick > 0 && !eventFrame.events.some(e => e.type === "first_feed"))
+  while (eventFrame.tick > 0 && !eventFrame.events.some(e => e.type === "first_feed" || e.type === 'feed'))
     eventFrame = trace.frames[eventFrame.tick - 1];
-  const events = eventFrame.events.filter(e => e.type === "first_feed");
+  const events = eventFrame.events.filter(e => e.type === "first_feed" || e.type === 'feed');
   $("feed-events").replaceChildren();
   if (!events.length) $("feed-events").textContent = "No feed yet. Press Play or Next feed to find the first recorded event.";
   feedCaption.hidden = traces.length !== 1 || !scene.layers.annotations;
@@ -310,12 +343,12 @@ function updateCycle() {
     : "Press Play to follow the round, or Next feed to inspect an event.";
   for (const event of events) {
     const button = document.createElement("button");
-    button.textContent = `Tick ${eventFrame.tick}: ${trace.workers[Number(event.worker)]} fed ${trace.larvae[Number(event.larva)].id}`;
-    button.title = "Pin this larva to inspect its first-feed state";
+    button.textContent = `Tick ${eventFrame.tick}: ${trace.workers[Number(event.worker)]} fed ${trace.larvae[Number(event.larva)].id}; hunger ${Number(event.hunger_before).toFixed(2)} → ${Number(event.hunger_after).toFixed(2)}`;
+    button.title = "Pin this larva to inspect its current hunger and total feeds";
     button.onclick = () => pin({kind: "larva", index: Number(event.larva), view: focused});
     $("feed-events").append(button);
   }
-  $<HTMLButtonElement>("next-feed").disabled = loading || !trace.frames.some(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed"));
+  $<HTMLButtonElement>("next-feed").disabled = loading || !trace.frames.some(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed" || e.type === 'feed'));
 }
 function definitions(host: HTMLElement, rows: [string, string][]) {
   host.replaceChildren();
@@ -398,8 +431,12 @@ function updateInspector() {
       ["Position (XY)", pos.join(", ")],
       ["Stage", larva.stage],
       ["Initial hunger", larva.hunger.toFixed(3)],
+      ["Remaining hunger", frame.hunger[selection.index].toFixed(3)],
+      ["Threshold reached", frame.satiated_at[selection.index] >= 0 ? `Tick ${frame.satiated_at[selection.index]}` : 'Not yet'],
+      ["Feeds received", String(frame.feed_counts[selection.index])],
+      ["State", frame.satiated_at[selection.index] >= 0 ? 'Full (model threshold)' : frame.feed_counts[selection.index] > 0 ? 'Part-fed, still hungry' : 'Unfed'],
       ["First feed", feed >= 0 ? `Tick ${feed}` : "Not yet served"],
-      ["Priority rule", "Random stage-based; fixed"],
+      ["Hunger rule", "Stage-random start; increases between feeds"],
     ]);
   } else {
     const points = [
@@ -458,7 +495,7 @@ scene.canvas.addEventListener("pointermove", (e) => {
       hover.textContent = `${t.workers[picked.index]} / ${target >= 0 ? `target ${t.larvae[target].id}` : "exploring"} / click to inspect`;
     } else if (picked.kind === "larva") {
       const larva = t.larvae[picked.index], feed = frame.first_feed[picked.index];
-      hover.textContent = `${larva.id} / ${larva.stage} / ${feed >= 0 ? `first fed at tick ${feed}` : "waiting"} / initial priority ${larva.hunger.toFixed(2)}`;
+      hover.textContent = `${larva.id} / ${larva.stage} / hunger ${frame.hunger[picked.index].toFixed(2)} / ${frame.feed_counts[picked.index]} feeds / ${frame.satiated_at[picked.index] >= 0 ? 'full' : feed >= 0 ? 'part-fed' : 'unfed'}`;
     } else hover.textContent = "Traversable background cell / not a larva";
   }
 });
@@ -498,10 +535,10 @@ function jump(to: number) {
 $("restart").onclick = () => jump(0);
 $("next-feed").onclick = () => {
   const trace = traces[focused];
-  const next = trace?.frames.find(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed"));
+  const next = trace?.frames.find(f => f.tick > Math.floor(tick) && f.events.some(e => e.type === "first_feed" || e.type === 'feed'));
   if (next) {
     jump(next.tick);
-    const feed = next.events.find(e => e.type === "first_feed")!;
+    const feed = next.events.find(e => e.type === "first_feed" || e.type === 'feed')!;
     pin({kind: "larva", index: Number(feed.larva), view: focused});
   }
 };
@@ -559,7 +596,7 @@ Promise.all(["manifest.json", "scenario-context.json"].map(path => fetch(path).t
 })))
   .then(([value, context]) => {
     if (
-      value.model_version !== "research-v2" ||
+      value.model_version !== "research-v3" ||
       !Array.isArray(value.scenarios) ||
       !value.scenarios.length
     )
@@ -592,5 +629,11 @@ Object.defineProperty(window, "labState", {
     measuredFps,
     renderer: scene.renderer?.info.memory,
     regions: traces.map((_, i) => scene.region(i)),
+    palette: {...scene.palette},
+    cameraTarget: scene.views[0]?.controls.target.toArray(),
+    partialExample: (() => {
+      const example = traces[focused]?.frames.find(f => f.feed_counts.some((n,l) => n > 0 && f.satiated_at[l] < 0));
+      return example ? {tick:example.tick,index:example.feed_counts.findIndex((n,l) => n > 0 && example.satiated_at[l] < 0)} : null;
+    })(),
   }),
 });

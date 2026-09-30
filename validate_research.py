@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from research_model import source_checksum, STRATEGIES
+from research_model import source_checksum, STRATEGIES, VERSION, HUNGER_GROWTH, FEED_DROP, SATIATION_THRESHOLD
 
 
 def validate_all():
@@ -11,6 +11,7 @@ def validate_all():
     runs = pd.DataFrame(report["runs"])
     fair = runs[runs.variant == "main"]
     assert report["source_checksum"] == source_checksum()
+    assert report['model_version'] == VERSION
     assert len(runs) == 2880 and len(fair) == 2160
     assert fair.groupby("strategy").size().to_dict() == dict.fromkeys(STRATEGIES, 360)
     assert fair.groupby(["scenario", "replicate"]).size().eq(6).all()
@@ -32,17 +33,28 @@ def validate_all():
         for strategy, path in scenario["traces"].items():
             trace = json.loads((Path("web/public") / path).read_text())
             assert trace["source_checksum"] == source_checksum()
+            assert trace['schema_version'] == 2 and trace['model_version'] == VERSION
+            assert trace['hunger_growth'] == HUNGER_GROWTH and trace['feed_drop'] == FEED_DROP
+            assert trace['satiation_threshold'] == SATIATION_THRESHOLD
             assert trace["strategy"] == strategy
             initial.append((trace["larvae"], trace["frames"][0]["positions"], trace["seed"]))
             frames = trace["frames"]
-            assert frames[-1]["fed"] == len(trace["larvae"])
+            assert (frames[-1]['fed'] == len(trace['larvae'])) == trace['summary']['finished']
             assert trace["summary"]["observed_steps"] == frames[-1]["tick"]
             for i, frame in enumerate(frames):
                 assert frame["tick"] == i
                 assert frame["phase"] == "post_tick"
-                assert frame["fed"] == sum(x >= 0 for x in frame["first_feed"])
+                assert frame["fed"] == sum(x >= 0 for x in frame["satiated_at"])
+                hunger = np.array(frame['hunger'])
+                assert len(hunger) == len(trace['larvae']) and np.isfinite(hunger).all()
+                assert ((hunger >= 0) & (hunger <= 1)).all()
+                assert all((s >= 0) == (h <= SATIATION_THRESHOLD) for s,h in zip(frame['satiated_at'],hunger))
                 if i:
                     previous = frames[i-1]
+                    expected = [h if s >= 0 else min(1., h + HUNGER_GROWTH[l['stage']])
+                                for h,s,l in zip(previous['hunger'], previous['satiated_at'], trace['larvae'])]
+                    counts = previous['feed_counts'].copy()
+                    satisfied = previous['satiated_at'].copy()
                     delta = np.abs(np.array(frame["positions"]) - np.array(previous["positions"])).sum(axis=1)
                     assert (delta <= 1).all()
                     assert frame["distance"] - previous["distance"] == int(delta.sum())
@@ -62,17 +74,32 @@ def validate_all():
                             broadcasts += 1
                             assert 0 <= event["target"] < len(trace["larvae"])
                             assert event["expires"] == i + 8
-                        elif event["type"] == "first_feed":
+                        elif event["type"] in ('first_feed', 'feed'):
                             larva = event["larva"]
-                            assert 0 <= larva < len(trace["larvae"]) and larva not in feed_events
-                            assert previous["first_feed"][larva] == -1 and frame["first_feed"][larva] == i
+                            assert 0 <= larva < len(trace["larvae"]) and satisfied[larva] < 0
+                            if event['type'] == 'first_feed':
+                                assert larva not in feed_events
+                                assert previous['first_feed'][larva] == -1 and frame['first_feed'][larva] == i
+                                feed_events.add(larva)
+                            else:
+                                assert previous['first_feed'][larva] >= 0 or larva in feed_events
                             assert trace["larvae"][larva]["xy"] == previous["positions"][worker]
-                            feed_events.add(larva)
+                            assert np.isclose(event['hunger_before'], expected[larva], atol=1e-10)
+                            expected[larva] = max(0., expected[larva] - FEED_DROP[trace['larvae'][larva]['stage']])
+                            assert np.isclose(event['hunger_after'], expected[larva], atol=1e-10)
+                            counts[larva] += 1
+                            if expected[larva] <= SATIATION_THRESHOLD:
+                                satisfied[larva] = i
                         else:
                             raise AssertionError("Unknown recorded event")
                     assert frame["messages"] - previous["messages"] == broadcasts
                     changed = {j for j, v in enumerate(frame["first_feed"]) if v != previous["first_feed"][j]}
                     assert changed == feed_events
+                    assert np.allclose(frame['hunger'], expected, atol=1e-10)
+                    assert frame['feed_counts'] == counts and frame['satiated_at'] == satisfied
+                else:
+                    assert frame['hunger'] == [l['hunger'] for l in trace['larvae']]
+                    assert not any(frame['feed_counts'])
             for larva in trace["larvae"]:
                 lo, hi = {"L1":(.2,.5),"L2":(.45,.75),"L3":(.65,1)}[larva["stage"]]
                 assert lo <= larva["hunger"] <= hi
@@ -80,9 +107,12 @@ def validate_all():
             assert trace["summary"]["completion_step"] == match.completion_step
             assert trace["summary"]["final_distance"] == match.final_distance
             assert trace["summary"]["messages"] == frames[-1]["messages"] == match.messages
+            assert trace["summary"]["total_feeds"] == sum(frames[-1]["feed_counts"]) == match.total_feeds
+            assert np.isclose(trace["summary"]["final_avg_hunger"], np.mean(frames[-1]["hunger"]))
+            assert np.isclose(trace["summary"]["final_avg_hunger"], match.final_avg_hunger)
             traces += 1
         assert all(state == initial[0] for state in initial)
-    assert len(list(Path("figures/research-v2").glob("*.png"))) == 6
+    assert len(list(Path("figures/research-v3").glob("*.png"))) == 6
     return {"nests":3,"scenarios":36,"fair_runs":2160,"ablations":720,"replays":traces,
             "extended_runs":len(report["extended"]),"incomplete_fair":int((~fair.finished).sum()),"source_verified":True}
 

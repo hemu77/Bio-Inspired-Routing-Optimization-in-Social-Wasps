@@ -1,145 +1,122 @@
 # Nest / Routing Lab
 ### Bio-Inspired Routing Optimization in Social Wasps
 
-**[Open the interactive lab](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/) | [Executed research notebook](final_analysis_v2.ipynb) | [Verification gates](docs/ACCEPTANCE.md)**
+**[Open the lab](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/) | [Executed report](final_analysis_v3.ipynb) | [Verification](docs/ACCEPTANCE.md)**
 
-![Verification status](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/actions/workflows/verify-publish.yml/badge.svg)
+![Verification](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/actions/workflows/verify-publish.yml/badge.svg)
 
-An agent-based project asking how movement, local information and worker coordination change the effort needed to serve a colony. Three observed nest layouts support 36 synthetic nest-bout scenarios. Six policies, ten paired replicates and two controlled ablations produce **2,880 simulations**. A layered 3D workstation makes recorded decisions inspectable, rather than merely animated.
+A dataset-grounded agent experiment: how do searching workers finish feeding a colony when larvae may need several feeds? Three observed nest layouts supply 36 synthetic nest-bout scenarios. Six policies, ten paired replicates and two ablations produce **2,880 executed simulations**. The browser replays recorded Python states, not a second model.
 
-> Research-v2 measures **first-feed coverage**, not satiation. Random initial hunger is an assumed priority, not measured physiology. Depth is illustrative; XY comes from the mapped simulation.
+> Research-v3 marks a larva full only when remaining hunger is **at most 0.12**. There is **no three-feed cap**. Hunger, portions and recovery rates are assumptions, not measurements of biological satiation or food mass.
 
-**Version boundary:** the live lab is an adapted research-v2 model, not the original notebook rendered in 3D. It changes movement/action timing, targeting and the feeding endpoint. Familiar `TSP`, `Biased`, `Random` and `Greedy` names identify the policy families, not identical implementations. The two local-information methods are explicitly labeled extensions. [Two-reviewer findings and fixes](docs/REVIEW_PANEL.md) document that distinction.
+![Dark-mode feeding round](docs/feeding-dark.png)
 
-![Single-method feeding-round replay](docs/lab-preview.png)
+## Read The Simulation
 
-## Read The Replay
+Dark mode covers the entire interface. **Light mode** changes panels, controls, canvas and agent shades together. The preference is saved when browser storage is available. Switching never resets time, layers, selection or camera.
 
-Start with TSP. The four baseline method buttons switch the rule while retaining the selected nest-bout scenario; comparison remains opt-in. Additional research methods live under a separate disclosure. The left explanation tells you what each method can know. A single replay illustrates a mechanism, not the overall ranking.
+**Blue: no feed yet. Blue-to-green gradient: partly fed, still hungry. Solid green: threshold reached. Gold: worker.** Partial color follows `1 - remaining_hunger`; it can move back toward blue as hunger recovers. It is not cumulative food consumption. Completed larvae also flatten. Pin a larva to see remaining hunger, feed count, first-feed time and completion time.
 
-Press **Next feed** to jump to a recorded feeding event and outline that larva in white. **Play** follows every stored tick; **Restart** returns to the same starting state. Blue larvae are waiting; teal, flattened larvae have received their first feed; gold workers have a segmented body. The same colors apply to 3D, fallback and the legend. Color and shape are redundant cues, not physiological observations. Playback controls, panel titles and legends occupy their own space, never the rendered nest.
+Choose **TSP, Biased, Random or Greedy**; local-information extensions are separately disclosed. Comparison shares actual model time and holds completed methods at their final frame. **Next feed** includes repeat feeds. Milestones and the staircase count full larvae, not larvae merely visited once.
 
-The coverage chart shows the complete recorded round: horizontal position is actual model time, vertical position is first-feed coverage. Its cursor marks the current frame. Coverage milestones jump to the first tick reaching 0%, 25%, 50%, 75% or 100%; they are navigation buttons, not the chart's time-axis labels. The final count and completion tick come from the trace, never a cosmetic animation stop.
+Drag to orbit; **Shift-drag or right-drag to pan**. Touch supports two-finger pan/pinch. Mouse-wheel zoom focuses on the pointer within each render region, excluding titles. **Reset view** fits and recenters the nest without resetting playback. Zooming crops the enlarged field by design; pan to inspect its other parts. Controls and legend never overlay rendered agents.
 
-Open **What counts as fed?**, **How to read the timeline**, or **Where these data come from** for beginner explanations. Method and control tooltips explain actions; hovering an agent shows its recorded target or feeding state. Display layers and reproducibility details are folded away until needed. The dataset drawer separates observed bout counts from simulated feeding events and random hunger.
+![Light-mode feeding round](docs/feeding-light.png)
 
-The redesign borrows a communication principle from [Simile's public presentation](https://www.simile.com/): state the question, distinguish grounding from assumptions, and explain validation before adding visual complexity. This is not a review of its private product, a Simile affiliation, or a claim that this model has comparable behavioral calibration.
+## Why This Matters
 
-## Why This Project Matters
+Distributed allocation appears in colony behavior, inspection and service routing. Reaching a nearby target is different from completing the colony. Charging feeding and communication an action makes that trade-off inspectable. This project does not establish that real wasps use these algorithms.
 
-Distributed groups can finish shared tasks without a central dispatcher. Wasp feeding makes that idea concrete: many workers must find many larvae, and reaching nearby targets is not the same as covering the whole nest efficiently. The engineering analogy includes inspection, service routing and multi-agent allocation. This project does **not** establish that real wasps use these algorithms.
+## Research Question
 
-## Research Question And Goal
+**With paired starting conditions, how do information, repeated feeding and coordination change completion time, movement and waiting?**
 
-**With matched starting conditions and action budgets, what trade-offs appear between whole-colony coverage, movement, waiting and communication?**
+Fair runs stop at full threshold coverage or 3,000 ticks. Incomplete main runs would receive a separate 10,000-tick pass, never mixed into fair rankings. All 2,160 newly executed fair runs completed; no extended pass was needed.
 
-Success means every synthetic larva receives its first feed. Runs stop at success or 3,000 ticks. Incomplete main runs receive a separate 10,000-tick pass, never mixed into the fair ranking. All 2,160 executed main runs finished, so no extended pass was needed.
+## Datasets And Grounding
 
-## Dataset Description
-
-Two private files are needed only to regenerate experiments:
-
-| Local file | Contribution | Does not establish |
+| Private local file | Contribution | Does not establish |
 |---|---|---|
-| `ED_FL_3nests1noC2.csv` | Cell coordinates, contents and stages | True initial hunger or 3D structure |
-| `ALL_FL_minmaj_final3noC2.csv` | Nest/bout groups, worker counts and activity summaries | Validation of simulated trajectories |
+| `ED_FL_3nests1noC2.csv` | Coordinates, cell contents and stages | Measured hunger or 3D biology |
+| `ALL_FL_minmaj_final3noC2.csv` | Nest/bout groups, observed worker counts and activity summaries | Validation of synthetic motion or feeding |
 
-| Nest | Bouts | Original larvae | Synthetic larvae | Grid width |
+| Nest | Bouts | Original larvae | Scaled larvae | Grid width |
 |---|---:|---:|---:|---:|
 | v14 | 10 | 34 | 68 | 22 |
 | v72 | 14 | 53 | 106 | 25 |
 | v87 | 12 | 67 | 134 | 28 |
 
-The inherited event grouping (`FL`, `FL2`, `LPL`, `SPL`) is an **assumed activity proxy** for worker-count scaling until a behavioral codebook is confirmed. It does not supply food resources or simulated feeding events. Public scenarios use ordinal labels such as `v87-S06`; original bout labels and worker identities are not exported. Derived summaries and selected synthetic traces are public. **Raw CSV datasets are not published.**
+The inherited grouping `FL`, `FL2`, `LPL`, `SPL` is an assumed activity proxy for staffing until a codebook is confirmed. It does not supply food stock or synthetic feeding events. Public ordinal scenario labels hide original bout and worker identities. **No raw CSV datasets are published.**
 
-The 2026-09-30 local audit rebuilt preprocessing from both private CSV files and verified exact equality of all 36 exported bout summaries and the three nest inventories with the saved report. This verifies local source grounding, not biological accuracy. Public readers cannot independently audit the withheld raw files. The source digest identifies Python code; it is not a checksum of the private datasets or every exported browser asset.
+Local preprocessing verified exact equality of all 36 public bout records and three inventories with the saved report. Public readers cannot independently audit withheld raw files. The source digest identifies Python code, not raw-data bytes or every browser asset. Reproducibility is not biological calibration.
 
-## Modeling Approach
+## Model And Hunger Rules
 
-An agent-based model tracks individual larvae and workers. Larvae remain in cells; workers move on a bounded square grid. All workers can feed. Food availability, role specialization and foraging trips are outside this experiment. Background cells remain traversable.
+Each original larva is duplicated once with deterministic jitter and collision-resolved grid placement. Extra agents and mapped positions are synthetic. Initial hunger is independently uniform by stage; `FL_freq` never sets it.
 
-One activation permits one cardinal move, one first feed at the current cell, **or** one claim broadcast. Feeding and broadcasting replace movement; neither is free. Initialization, scheduling and policy choices use independent random streams. Policies inside a scenario-replicate receive the same colony, worker count, grid and scheduler seed. Extra policy random draws cannot change activation order.
+| Stage | Random initial hunger | Growth / hungry tick | Reduction / feed |
+|---|---|---:|---:|
+| L1 (i1/i2) | [0.20, 0.50] | 0.020 | 0.35 |
+| L2 (i3/i4) | [0.45, 0.75] | 0.028 | 0.45 |
+| L3 (i5) | [0.65, 1.00] | 0.035 | 0.55 |
 
-Unfinished runs have `completion_step: null` and `stop_reason: "horizon"`. Horizon-capped time includes failures at 3,000; travel is measured in cardinal grid units, not metabolic energy. Restricted waiting ends at first feed or the censoring horizon.
+Hunger grows once before each activation round, capped at 1. Feeding reduces it, floored at 0. Larvae stay eligible until hunger reaches 0.12 or less, regardless of feed count. Full larvae stop recovering hunger within this **single round**; subsequent nutritional cycles are not modeled.
 
-## Agent Behavior And Strategies
+Ten deterministic replicate seeds vary initial hunger. All policies within a scenario-replicate share the initial colony, hunger, staffing and scheduler seed. Staffing is `max(ceil(larvae/5), observed workers) + ceil(grouped activity events/100)`, an engineering assumption, not a biological staffing law.
 
-| Identifier | Information | Actual rule |
+One worker action is a cardinal move **or** a feed **or** a broadcast. Feeding takes place at the worker's starting cell. Several workers can feed one still-hungry larva in scheduler order in a tick, but never after completion. There is no collision avoidance, food depot, portion transport or metabolic energy model. Ticks are not seconds.
+
+## Movement Policies
+
+| Method | Information | Rule |
 |---|---|---|
-| `random` | Blind | Independent cardinal random walk |
-| `biased` | Blind | Persistent direction; 25% chance to redraw |
-| `greedy` | Global | Stochastic target weighted by initial priority / (1 + Manhattan distance) |
-| `tsp` | Global | Nearest-neighbour tour; historical name, **not an optimal TSP solver** |
-| `local_nearest` | Local | Nearest observed or remembered target; explore otherwise |
-| `local_urgency_claims` | Local | Observed priority / (1 + distance), with expiring local claims |
+| Random | Blind | Independent cardinal random walk |
+| Biased | Blind | Persistent direction; 25% redraw probability |
+| Greedy | Global | Stochastic target weighted by remaining hunger / (1 + Manhattan distance) |
+| TSP | Global | Nearest-neighbour tour; historical name, not an optimal TSP solver |
+| Local nearest | Local | Nearest observed/remembered hungry target; exploration otherwise |
+| Local urgency + claims | Local | Observed hunger / (1 + distance), with expiring local claims |
 
-Local sensing and communication use Manhattan radius 3. Bounded memory stores at most 256 observed locations, served states and priorities. Workers explore least-visited neighbors when no target is known. Claims expire after 8 ticks, with renewal considered every 4; lower worker IDs resolve received conflicts.
+Local sensing/communication radius is three Manhattan moves. Memory holds at most 256 observed records, not unseen global state. Claims expire after eight ticks; renewal is considered every four. Lower worker IDs resolve received conflicts. Broadcasting costs an action. Activation permutations use a separate RNG stream from policy choices.
 
-Two urgency ablations disable claims or enable global sensing. Local nearest versus urgency without claims additionally exposes priority selection. Information classes differ: a comparison across classes cannot isolate routing alone.
+## Newly Executed Results
 
-## Synthetic Scaling And Hunger
+Rank reliability first, then median horizon-capped time, then median movement per completed larva. Each strategy has 360 fair runs.
 
-`SCALE_FACTOR=2` duplicates each original larva once with deterministic coordinate jitter and collision-resolved grid placement. Added larvae are synthetic; quantized grid locations are not raw physical coordinates.
-
-| Stage | Uniform initial priority |
-|---|---|
-| L1 (i1/i2) | [0.20, 0.50] |
-| L2 (i3/i4) | [0.45, 0.75] |
-| L3 (i5) | [0.65, 1.00] |
-
-Initial hunger stays fixed. `FL_freq` never drives it; a regression test changes frequency values and checks identical initialization. Seed 42 anchors deterministic derived seeds; ten replicates vary assumptions in paired experiments.
-
-The retained staffing rule is `max(ceil(larvae/5), observed workers) + ceil(grouped activity events/100)`. This is an engineering workload assumption, not a calibrated biological staffing law.
-
-## Key Results And Interpretation
-
-Ranking sorts reliability first, then median horizon-capped time, then median movement per served larva. Each policy has 360 fair runs.
-
-| Policy | Completed | Median ticks | Median travel / served | Median priority-weighted wait |
+| Strategy | Completed | Median ticks | Median travel / completed larva | Initial-hunger-weighted wait |
 |---|---:|---:|---:|---:|
-| Local nearest | 100% | 57 | 11.55 | 21.29 |
-| Local urgency + claims | 100% | 67 | 10.39 | 25.11 |
-| Global NN tour | 100% | 133 | 28.25 | 60.96 |
-| Global weighted choice | 100% | 190 | 40.01 | 90.74 |
-| Persistent walk | 100% | 268 | 46.62 | 48.60 |
-| Random walk | 100% | 367.5 | 77.66 | 78.72 |
+| Local urgency + claims | 100% | 74 | 10.59 | 29.79 |
+| Local nearest | 100% | 79 | 15.04 | 28.36 |
+| TSP | 100% | 173.5 | 34.70 | 72.80 |
+| Greedy | 100% | 208 | 42.69 | 99.80 |
+| Biased | 100% | 278.5 | 46.76 | 53.80 |
+| Random | 100% | 389.5 | 79.60 | 83.28 |
 
-**No unconditional coordination win:** local nearest is faster. Urgency with claims travels less but waits longer; its median time is 67 versus 60 without claims. Charging communication an action exposes that trade-off. These are conditional simulation results, not biological population claims or proof of an optimal algorithm.
+Unlike first-feed v2, local urgency now ranks ahead of local nearest by median completion time and movement; its initial-hunger-weighted wait is slightly higher. This is conditional simulation evidence, not a universal coordination win. Claims-off/global-sensing ablations remain separate.
 
-Six figures answer explicit questions: coverage dynamics, reliability/capped time, travel per served larva, restricted waiting, all-scenario robustness and coordination-cost ablations. Replicate envelopes are conditional stochastic variability, **not biological confidence intervals**. Unsupported composite difficulty and redundant four-point frontiers were removed from v2.
+Six figures address threshold coverage, reliability/time, travel per full larva, restricted waiting until completion, every scenario, and communication cost. Unfinished waits are censored at the fair horizon. Replicate envelopes are stochastic variability conditional on these layouts, not biological confidence intervals. Wait weights use initial hunger, not terminal hunger.
 
-![All-scenario comparison](figures/research-v2/05_scenarios.png)
+## What Is Distinctive
 
-## Why This Is Distinctive
-
-The contribution is an **auditable experiment-to-replay workflow**, not decorative 3D. Every visible feed, target, claim and decision reason comes from the benchmark's Python engine. Paired scheduler streams, local observations, message cost, timeout handling and negative ablation findings make assumptions inspectable. The reader can question what an agent could know, not just watch motion.
-
-Six layers control nest structure, larvae, workers, routes/targets, sensing and annotations. Pin by clicking or by keyboard-accessible entity selector; hidden pins remain identified, and overlapping workers have explicit selection. Camera state persists through seek/playback. Four-method comparison uses one renderer and one **actual tick** clock; finished methods hold their final state. Interactive 2D fallback retains playback, layers, picking and inspection.
+The contribution is not decorative 3D. One audited engine connects results, readable analysis and inspectable events. Partial feeds and completion are separate; communication has a cost; local information stays local; paired replicates prevent scheduler confounding; failures cannot become cosmetic completed animations. Public synthetic checks require no private datasets. Depth is illustrative; XY is exactly the simulation's mapped geometry.
 
 ## Notebook And Code Guide
 
-| File | Responsibility |
+| Artifact | Role |
 |---|---|
-| `final_analysis_v2.ipynb` | Executed teaching report: data, assumptions, results, four replays, six figures and validation |
-| `research_model.py` | Research actions, policies, metrics and trace contract |
-| `run_research.py` | Sequential, resumable experiments and anonymized trace export |
-| `research_report.py` | Figures and interpretations; no duplicate simulation |
-| `research_results.json` | Derived summaries and per-tick metrics |
-| `validate_research.py` | Counts, pairing, provenance and replay/result consistency |
-| `export_viewer_context.py` | Small selected-scenario metadata export, checked against saved results and all 24 traces |
-| `web/` | TypeScript, Vite, Three.js workstation and browser checks |
-| `wasp_routing_analysis.py` | Legacy-derived baseline helper and reused preprocessing/placement; not identical to every prototype cell |
-| `final_analysis.ipynb` | Previous report, retained as legacy |
+| `final_analysis_v3.ipynb` | Executed all-nest report, four replay links and six figures |
+| `research_model.py` | Actions, hunger, policies, metrics and schema-2 snapshots |
+| `run_research.py` | Sequential/resumable experiments and replay exports |
+| `research_report.py` | Figures from saved results; no second simulation |
+| `validate_research.py` | Pairing, provenance, action/event and hunger-transition checks |
+| `export_viewer_context.py` | Selected bout metadata checked against all 24 replays |
+| `web/` | Three.js viewer, fallback, themes and browser checks |
 
-The original four GIF/HTML exports remain in `animations/` and belong to **legacy-v1**, not the new endpoint. GitHub sanitizes notebook JavaScript/iframes: open the live lab for v2 playback. Local Jupyter renders the live iframe embeds.
-
-**Play the adapted research-v2 baselines:** [TSP](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=tsp), [Biased](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=biased), [Random](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=random), [Greedy](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=greedy), or [synchronized comparison](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&compare=1).
-
-**Preserved legacy HTML players, unchanged:** [TSP](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_tsp.html), [Biased](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_biased.html), [Random](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_random.html), [Greedy](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_greedy.html). These are frozen notebook-era exports with their own endpoint and sampling; do not compare their time or completion percentages directly with v2. They load only when opened, not into the 3D viewer's memory.
+The notebook proceeds through context, data, synthetic construction, hunger rules, actions, benchmark/ablations, playable simulations, six analysis questions, limits and validation. GitHub sanitizes notebook JavaScript/iframes: use the live lab for playback.
 
 ## Run Locally
 
-Verified with Python 3.11 and Node.js 24; scientific packages are pinned and npm dependencies locked.
+Verified with Python 3.11 and Node.js 24; requirements are pinned and npm dependencies locked.
 
 ```powershell
 python -m venv .venv
@@ -148,23 +125,17 @@ python -m pip install -r requirements.txt
 python -m unittest test_research_model -v
 python validate_research.py
 python execute_research_notebook.py
-jupyter lab final_analysis_v2.ipynb
+jupyter lab final_analysis_v3.ipynb
 ```
 
-The report runs without private data. To regenerate experiments, place the two CSV files beside the scripts:
+Derived reports run without private files. To regenerate, put both private CSV files beside the scripts without committing them:
 
 ```powershell
-python measure_smoke.py
 python run_research.py
 python export_viewer_context.py
 python research_report.py
 python build_research_notebook.py
 python execute_research_notebook.py
-```
-
-Atomic checkpoints under ignored `outputs/` resume compatible tasks. Changed source, geometry or scenario configuration invalidates the key. One simulation worker is intentional on the 16 GB laptop.
-
-```powershell
 cd web
 npm ci
 npm run build
@@ -172,22 +143,12 @@ npm test
 npm run dev
 ```
 
-Local browser tests use installed Chrome; CI installs Chromium. Add `?2d=1` to test fallback. Space plays/pauses and arrow keys step when focus is outside form controls. There is no autoplay or mandatory camera animation.
+Ignored `outputs/` checkpoints resume only compatible source/geometry/scenario configurations. One simulation worker keeps the 16 GB workload bounded. Rendering uses one WebGL context, DPR at most 1.5 and a 30 Hz cap; hidden tabs pause. Local sampling measured 25 renders/s and about 39 MiB JS heap, not total browser RAM. Use `?2d=1` for fallback; orbit/pan/zoom require WebGL.
 
-## Verification And Device Budget
+## Versions And Limitations
 
-- [x] Legacy reproduced: 144 runs; NN-tour median 67, greedy 142.5, persistent 463.5, random 529.
-- [x] Nine public synthetic checks cover actions, feed-once, memory, claims, broadcast cost, RNG pairing, repeatability, censoring and frequency independence.
-- [x] 2,160 fair runs plus 720 ablations; all fair runs completed.
-- [x] Browser checks cover playback, seeking, four-method clock, hidden pins, orbit-vs-click, disposal, mobile and fallback.
-- [x] Dependency audit, locked build and private-data exclusion.
+Preserved notebook-era players, unchanged: [TSP](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_tsp.html), [Biased](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_biased.html), [Random](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_random.html), [Greedy](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_greedy.html).
 
-Initial 18-run smoke: 4.0 seconds, measured peak Python RSS 217.4 MiB. Observed full-run Python RSS reached 328 MiB. A local playback sample measured 24 renders/s and about 25 MiB **JS heap**, not total browser process memory. Rendering is capped at 30 Hz, DPR at 1.5, hidden tabs pause, and old geometry is disposed. Hosted software-WebGL CI does not certify laptop FPS.
+[legacy-v1](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/legacy-v1) preserves the earlier report. [research-v2-first-feed](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/research-v2-first-feed) preserves the first-feed model, results and viewer. V3 restores inherited hunger growth/portion reductions but removes the three-feed cap at the user's request. It retains v2's one-cardinal-action budget, so it is not identical to the prototype. Old notebooks require their matching archived code; endpoints across versions are not directly comparable.
 
-## Limitations And Next Improvements
-
-There is no measured hunger, calibrated physiology, realistic food transport, collision avoidance or biological 3D geometry. Synthetic replicas and reused layouts reduce generalizability; only three real nests are represented. Event interpretation and worker scaling need domain confirmation. Priority-weighted wait is an assumed objective, not measured welfare.
-
-Next: confirmed behavioral codebook, held-out nests, measured feeding timestamps, prespecified radius/resource sensitivity tests and calibrated transport. Learned policies and richer geometry should follow evidence that they answer a research question, not visual complexity alone.
-
-Legacy results and the original PDF remain preserved at [legacy-v1](https://github.com/hemu77/Bio-Inspired-Routing-Optimization-in-Social-Wasps/tree/legacy-v1).
+Only three observed layouts exist. Duplication, uncalibrated rates, unlimited feeding and absorbing completion limit biological interpretation. Next: confirm the codebook, calibrate hunger/portions, test held-out nests and preregister sensitivity checks before claiming biological realism.

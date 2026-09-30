@@ -28,8 +28,11 @@ type View = {
   marker: THREE.Mesh;
   trace: Trace;
 };
-export const replayColors = {waiting: "#80bfff", fed: "#51b5a1", worker: "#f5c451"};
-const teal = new THREE.Color(replayColors.fed), waiting = new THREE.Color(replayColors.waiting);
+export const replayThemes = {
+  dark: {waiting:"#80bfff", fed:"#65d68b", partial:"#72c6ba", worker:"#f5c451", background:"#20282b", grid:"#53676a", selection:"#ffffff", wings:"#fff6d8"},
+  light: {waiting:"#235c9d", fed:"#20753f", partial:"#327d83", worker:"#8a5600", background:"#edf1f3", grid:"#62777e", selection:"#152e37", wings:"#65583a"},
+};
+export const replayColors = replayThemes.dark;
 export class ReplayScene {
   renderer: THREE.WebGLRenderer | null = null;
   canvas: HTMLCanvasElement;
@@ -47,6 +50,29 @@ export class ReplayScene {
   };
   selected: Entity | null = null;
   changed = true;
+  palette = replayThemes.dark;
+  setTheme(mode: keyof typeof replayThemes) {
+    this.palette = replayThemes[mode];
+    this.renderer?.setClearColor(this.palette.background);
+    for (const view of this.views) {
+      (view.marker.material as THREE.MeshBasicMaterial).color.set(this.palette.selection);
+      view.wasps.forEach((m, i) => (m.material as THREE.MeshBasicMaterial).color.set(i < 3 ? this.palette.worker : this.palette.wings));
+      view.structure.traverse(o => {
+        if (o instanceof THREE.GridHelper) {
+          const colors = o.geometry.getAttribute('color');
+          const c = new THREE.Color(this.palette.grid);
+          for (let i = 0; i < colors.count; i++) colors.setXYZ(i, c.r, c.g, c.b);
+          colors.needsUpdate = true;
+        }
+      });
+    }
+    this.changed = true;
+  }
+  private larvaColor(frame: Frame, index: number) {
+    const waiting = new THREE.Color(this.palette.waiting);
+    if (frame.satiated_at[index] >= 0) return new THREE.Color(this.palette.fed);
+    return frame.feed_counts[index] > 0 ? waiting.lerp(new THREE.Color(this.palette.fed), 1 - frame.hunger[index]) : waiting;
+  }
   private ray = new THREE.Raycaster();
   private dummy = new THREE.Object3D();
   constructor(
@@ -80,6 +106,30 @@ export class ReplayScene {
     }
     if (!this.renderer) this.fallback = this.canvas.getContext("2d");
     host.append(this.canvas);
+    // OrbitControls assumes the whole canvas is the viewport. Our titles/scissor
+    // panels need region-relative cursor zoom instead of that normalization.
+    this.canvas.addEventListener('wheel', e => {
+      if (!this.renderer || !this.views.length) return;
+      const box = this.canvas.getBoundingClientRect();
+      const x = e.clientX - box.left, y = e.clientY - box.top;
+      const index = this.traces.findIndex((_,i) => {
+        const r = this.region(i);
+        return x >= r.x && x <= r.x+r.w && y >= r.y && y <= r.y+r.h;
+      });
+      if (index < 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const {camera, controls} = this.views[0], r = this.region(index);
+      this.ray.setFromCamera(new THREE.Vector2((x-r.x)/r.w*2-1, -(y-r.y)/r.h*2+1), camera);
+      const anchor = this.ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0), new THREE.Vector3()) ?? controls.target.clone();
+      const distance = camera.position.distanceTo(controls.target);
+      const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.h : 1);
+      const scale = THREE.MathUtils.clamp(distance * Math.exp(THREE.MathUtils.clamp(delta,-500,500)*.001), controls.minDistance, controls.maxDistance) / distance;
+      camera.position.sub(anchor).multiplyScalar(scale).add(anchor);
+      controls.target.sub(anchor).multiplyScalar(scale).add(anchor);
+      controls.update();
+      this.changed = true;
+    }, {passive:false, capture:true});
     new ResizeObserver(() => {
       this.resize();
       this.changed = true;
@@ -131,6 +181,7 @@ export class ReplayScene {
       this.views = traces.map((trace, i) => this.createView(trace, i));
     this.resize();
     this.reset();
+    this.setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
     this.changed = true;
   }
   private createView(trace: Trace, index: number): View {
@@ -152,6 +203,7 @@ export class ReplayScene {
     controls.minDistance = 5;
     controls.maxDistance = 90;
     controls.enableDamping = false;
+    controls.screenSpacePanning = false;
     controls.addEventListener("change", () => (this.changed = true));
     // Comparison keeps all cameras aligned; the first owns pointer controls.
     controls.enabled = index === 0;
@@ -162,8 +214,8 @@ export class ReplayScene {
     const grid = new THREE.GridHelper(
       trace.grid_size,
       trace.grid_size,
-      "#465655",
-      "#2d383b",
+      this.palette.grid,
+      this.palette.grid,
     );
     structure.add(grid);
     const cellPoints = [
@@ -218,7 +270,7 @@ export class ReplayScene {
     );
     larvae.userData.kind = "larva";
     scene.add(larvae);
-    const marker = new THREE.Mesh(new THREE.RingGeometry(.43, .49, 24), new THREE.MeshBasicMaterial({color: "#ffffff", side: THREE.DoubleSide}));
+    const marker = new THREE.Mesh(new THREE.RingGeometry(.43, .49, 24), new THREE.MeshBasicMaterial({color: this.palette.selection, side: THREE.DoubleSide}));
     marker.rotation.x = -Math.PI / 2;
     marker.visible = false;
     scene.add(marker);
@@ -227,7 +279,7 @@ export class ReplayScene {
         new THREE.SphereGeometry(1, 8, 6),
         new THREE.MeshBasicMaterial({
           color:
-            segment < 3 ? replayColors.worker : "#fff6d8",
+            segment < 3 ? this.palette.worker : this.palette.wings,
           transparent: segment >= 3,
           opacity: segment >= 3 ? 0.6 : 1,
         }),
@@ -310,7 +362,7 @@ export class ReplayScene {
           material.opacity = this.layers.opacity;
       });
       trace.larvae.forEach((larva, j) => {
-        const served = frame.first_feed[j] >= 0;
+        const served = frame.satiated_at[j] >= 0;
         const radius = { L1: 0.16, L2: 0.23, L3: 0.29 }[larva.stage] || 0.2;
         this.transform(
           view.larvae,
@@ -322,7 +374,7 @@ export class ReplayScene {
         );
         view.larvae.setColorAt(
           j,
-          served ? teal : waiting,
+          this.larvaColor(frame, j),
         );
       });
       view.larvae.instanceMatrix.needsUpdate = true;
@@ -387,7 +439,7 @@ export class ReplayScene {
           view.routes.add(
             new THREE.Line(
               new THREE.BufferGeometry().setFromPoints(points),
-              new THREE.LineBasicMaterial({ color: "#e4b64b" }),
+              new THREE.LineBasicMaterial({ color: this.palette.worker }),
             ),
           );
           const target = frame.targets[worker];
@@ -400,7 +452,7 @@ export class ReplayScene {
                   new THREE.Vector3(xy[0] - size / 2, 0.6, xy[1] - size / 2),
                 ]),
                 new THREE.LineBasicMaterial({
-                  color: "#55b5aa",
+                  color: this.palette.fed,
                   transparent: true,
                   opacity: 0.5,
                 }),
@@ -531,7 +583,7 @@ export class ReplayScene {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const width = this.host.clientWidth,
       height = this.host.clientHeight;
-    ctx.fillStyle = "#20282b";
+    ctx.fillStyle = this.palette.background;
     ctx.fillRect(0, 0, width, height);
     this.traces.forEach((trace, i) => {
       const frame =
@@ -548,7 +600,7 @@ export class ReplayScene {
       ctx.rect(x, y, w, h);
       ctx.clip();
       if (this.layers.structure) {
-        ctx.strokeStyle = "#5e6e6b";
+        ctx.strokeStyle = this.palette.grid;
         ctx.globalAlpha = this.layers.opacity;
         for (const p of [
           ...trace.larvae.map((l) => l.xy),
@@ -580,7 +632,7 @@ export class ReplayScene {
               }
         }
         if (this.layers.routes) {
-          ctx.strokeStyle = "#e2b447";
+          ctx.strokeStyle = this.palette.worker;
           ctx.beginPath();
           trace.frames
             .slice(Math.max(0, frame.tick - 30), frame.tick + 1)
@@ -594,9 +646,9 @@ export class ReplayScene {
       if (this.layers.larvae)
         trace.larvae.forEach((l, j) => {
           const p = project(l.xy),
-            fed = frame.first_feed[j] >= 0;
+            fed = frame.satiated_at[j] >= 0;
           const radius = {L1: .16, L2: .23, L3: .29}[l.stage] || .2;
-          ctx.fillStyle = fed ? replayColors.fed : replayColors.waiting;
+          ctx.fillStyle = `#${this.larvaColor(frame, j).getHexString()}`;
           ctx.beginPath();
           ctx.ellipse(
             ...p,
@@ -611,7 +663,7 @@ export class ReplayScene {
       if (this.layers.wasps)
         frame.positions.forEach((p) => {
           const xy = project(p);
-          ctx.fillStyle = replayColors.worker;
+          ctx.fillStyle = this.palette.worker;
           ctx.fillRect(
             xy[0] - scale * 0.2,
             xy[1] - scale * 0.12,
@@ -621,7 +673,7 @@ export class ReplayScene {
         });
       const selectedXY = this.selectedXY(trace, frame, i);
       if (selectedXY) {
-        ctx.strokeStyle = "#ffffff";
+        ctx.strokeStyle = this.palette.selection;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(...project(selectedXY), scale * .49, 0, Math.PI * 2);

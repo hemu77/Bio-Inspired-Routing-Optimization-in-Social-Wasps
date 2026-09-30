@@ -14,7 +14,7 @@ LABELS = {"random": "Random walk", "biased": "Persistent walk", "greedy": "Globa
 COLORS = dict(zip(STRATEGIES, ["#ac6744", "#9b8454", "#697b9a", "#355777", "#46847d", "#176257"]))
 
 
-def generate_report(report=None, output=Path("figures/research-v2")):
+def generate_report(report=None, output=Path("figures/research-v3")):
     report = report or json.loads(Path("research_results.json").read_text())
     runs = pd.DataFrame(report["runs"])
     main = runs[runs.variant == "main"].copy()
@@ -50,7 +50,7 @@ def generate_report(report=None, output=Path("figures/research-v2")):
             ax.plot(grid, matrix.mean(axis=0) * 100, label=LABELS[strategy], color=COLORS[strategy], lw=2)
             ax.fill_between(grid, np.percentile(matrix, 10, axis=0) * 100,
                             np.percentile(matrix, 90, axis=0) * 100, color=COLORS[strategy], alpha=.12)
-    axes[0].set(xlabel="Actual simulation tick / early-cycle detail", ylabel="Mean first-feed coverage (%)",
+    axes[0].set(xlabel="Actual simulation tick / early-cycle detail", ylabel="Mean larvae reaching hunger threshold (%)",
                 xlim=(0, 600), ylim=(0, 102))
     axes[1].set(xlabel="Full fair horizon", xlim=(0, 3000), xticks=[0,1500,3000])
     axes[0].legend(loc="lower right", frameon=False, ncol=1, fontsize=10)
@@ -80,7 +80,7 @@ def generate_report(report=None, output=Path("figures/research-v2")):
     for patch, strategy in zip(boxes["boxes"], STRATEGIES): patch.set_facecolor(COLORS[strategy]); patch.set_alpha(.7)
     ax.set(xlabel="Total cardinal movement / larvae served at fair stopping point")
     ax.grid(axis="x", alpha=.2)
-    save(fig, "03_movement", "How much movement buys one first feed?",
+    save(fig, "03_movement", "How much movement buys one fully served larva?",
          "Lower values mean less grid travel per served larva. Boxplots show all scenario-replicate runs rather than just four aggregate points. Read this with the reliability panel: a policy that serves fewer larvae is not automatically preferable because it moves less; distance is a computational proxy, not measured metabolic energy.")
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 6.5), sharey=True)
@@ -91,7 +91,7 @@ def generate_report(report=None, output=Path("figures/research-v2")):
         for patch, strategy in zip(boxes["boxes"], STRATEGIES): patch.set_facecolor(COLORS[strategy]); patch.set_alpha(.65)
         ax.set(xlabel="Restricted waiting ticks", title=title)
     save(fig, "04_waiting", "Does efficient routing leave larvae waiting?",
-         "Each larva's wait starts at tick zero and ends at its first feed; unserved larvae are censored at 3000. The left measures the long-waiting tail, while the right weights waits by randomly assigned initial hunger. These are restricted waiting metrics and assumed priorities, not evidence of physiological starvation or measured welfare.")
+         "Each larva's wait starts at tick zero and ends when its remaining hunger reaches 0.12 or less; unfinished larvae are censored at 3000. The left measures the long-waiting tail, while the right weights waits by randomly assigned initial hunger, not terminal hunger. These are model-threshold waiting metrics, not evidence of physiological starvation or measured welfare.")
 
     grouped = main.groupby(["scenario", "strategy"]).observed_steps.median().unstack().reindex(columns=STRATEGIES)
     fig, ax = plt.subplots(figsize=(12, 13))

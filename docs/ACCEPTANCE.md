@@ -1,5 +1,26 @@
 # Upgrade Gates
 
+## Current: Research-v3
+The original first-feed gates below are historical v2 evidence, not the active
+feeding endpoint. V2 is preserved at `research-v2-first-feed`.
+
+- [x] Full means recorded remaining hunger <= 0.12; no feed-count cap.
+- [x] Synthetic regression proves three spaced feeds can still leave a larva hungry.
+- [x] All 2160 fair runs and 720 ablations rerun; no extended runs needed.
+- [x] Schema-2 replays carry remaining hunger, counts and threshold time per larva.
+- [x] Validation reconstructs every growth/feed transition and rejects false completion.
+- [x] Dark and light themes preserve camera, clock, selection, layers and frames.
+- [x] Pointer-centered wheel zoom uses render-region coordinates; ground-plane pan and reset verified.
+- [x] `final_analysis_v3.ipynb` executed: 43 cells, six PNGs, 12 HTML outputs, no errors.
+- [x] Ten model tests and 22 browser tests pass, including corrupted replay rejection and Shift-drag pan.
+- [x] Two bounded read-only reviews completed; findings and repairs are in `REVIEW_V3.md`.
+
+Rates are inherited assumptions, not calibrated physiology. Completion is
+absorbing within one round; another hunger cycle is outside scope. New results
+replace v2 rankings only for this new endpoint.
+
+## Historical: Research-v2
+
 Checkboxes become checked only after evidence is recorded. RED means failing or unverified; GREEN means tested, not a guarantee of biological truth.
 
 | What existed | What was wrong | Improvement / distinct contribution | Test gate |
