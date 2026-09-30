@@ -1,0 +1,82 @@
+import unittest
+import numpy as np
+from continuous_model import ContinuousModel, run_continuous, SUPPLIES
+
+
+class ContinuousFeedingTests(unittest.TestCase):
+    def test_full_larva_reopens_and_receives_another_feed(self):
+        m = ContinuousModel([[0, 0]], [.2], ["L1"], 1, 1, 42, "random")
+        m.loads[0] = 1.
+        m.step()
+        self.assertLessEqual(m.hunger[0], .12)
+        self.assertEqual(m.feed_counts[0], 1)
+        for _ in range(10):
+            m.step()
+        self.assertGreater(m.hunger_returns[0], 0)
+        self.assertGreater(m.refeeds[0], 0)
+        self.assertGreater(m.feed_counts[0], 1)
+
+    def test_small_load_cannot_supply_a_full_portion(self):
+        m = ContinuousModel([[0, 0]], [.7], ["L3"], 1, 1, 42, "random")
+        m.loads[0] = .1
+        m.step()
+        self.assertAlmostEqual(m.hunger[0], .635)
+        self.assertAlmostEqual(m.consumed, .1)
+        self.assertAlmostEqual(m.loads[0], 0.)
+        self.assertEqual(m.satiated_at[0], -1)
+
+    def test_conservation_and_action_budget_all_policies(self):
+        from research_model import STRATEGIES
+        for strategy in STRATEGIES:
+            model, summary, frames = run_continuous(strategy, "variable", horizon=90, trace=True)
+            for prior, f in zip(frames, frames[1:]):
+                self.assertAlmostEqual(model.initial_stock + f["delivered"],
+                                       f["food_stock"] + sum(f["worker_loads"]) + f["consumed"])
+                self.assertGreaterEqual(min(f["worker_loads"]), -1e-10)
+                self.assertLessEqual(max(f["worker_loads"]), model.capacity)
+                self.assertEqual(f["fed"], sum(h <= .12 for h in f["hunger"]))
+                workers = []
+                for event in f["events"]:
+                    worker = event["worker"]
+                    workers.append(worker)
+                    self.assertEqual(prior["positions"][worker], f["positions"][worker])
+                self.assertEqual(len(workers), len(set(workers)))
+                for a, b in zip(prior["positions"], f["positions"]):
+                    self.assertLessEqual(sum(abs(x-y) for x, y in zip(a, b)), 1)
+            self.assertEqual(summary["observed_steps"], 90)
+
+    def test_delivery_stream_paired_and_reproducible(self):
+        _, a, frames_a = run_continuous("random", "scarce", horizon=60, trace=True)
+        _, b, frames_b = run_continuous("tsp", "scarce", horizon=60, trace=True)
+        self.assertEqual([f["delivery"] for f in frames_a], [f["delivery"] for f in frames_b])
+        self.assertEqual(run_continuous("random", "scarce", horizon=60)[1], a)
+        self.assertEqual(a["food_delivered"], b["food_delivered"])
+
+    def test_empty_worker_returns_and_refill_costs_an_action(self):
+        m = ContinuousModel([[0, 0]], [.7], ["L3"], 3, 1, 42, "random")
+        m.positions[0] = [0, 0]
+        m.step()
+        self.assertEqual(m.feed_counts[0], 0)
+        self.assertEqual(m.reason[0], "empty; return to depot")
+        m.positions[0] = m.depot
+        m.step()
+        np.testing.assert_array_equal(m.positions[0], m.depot)
+        self.assertGreater(m.loads[0], 0)
+        self.assertEqual(m.reason[0], "refill at depot")
+
+    def test_invalid_resources_rejected(self):
+        for bad in [dict(capacity=0), dict(capacity=float("nan")), dict(initial_stock=-1), dict(supply="unknown")]:
+            with self.assertRaises(ValueError):
+                ContinuousModel([[0, 0]], [.5], ["L1"], 1, 1, 42, "random", **bad)
+
+    def test_tour_requeues_returning_hunger_without_losing_current_visit(self):
+        m = ContinuousModel([[0, 0], [0, 1]], [.11, .7], ["L1", "L3"], 4, 1, 42, "tsp")
+        m.loads[0] = 1.
+        m.queues[0] = [1]
+        m.step()
+        self.assertEqual(m.queues[0], [1, 0])
+        self.assertEqual(m.target[0], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

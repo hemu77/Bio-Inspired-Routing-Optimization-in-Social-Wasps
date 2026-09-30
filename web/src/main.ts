@@ -13,6 +13,11 @@ const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 // Playback stays in document flow, never over the lower comparison panels.
 document.querySelector("main")!.before(document.querySelector("footer")!);
+const continuousLink = document.createElement('a');
+continuousLink.href = 'continuous.html';
+continuousLink.textContent = 'Continuous feeding experiment';
+continuousLink.title = 'Synthetic nests with returning hunger and finite food deliveries';
+document.querySelector('nav')!.append(continuousLink);
 document.querySelector("nav .compare")!.lastChild!.textContent = " Compare four baselines";
 const modelNote = document.createElement("p");
 modelNote.className = "model-note";

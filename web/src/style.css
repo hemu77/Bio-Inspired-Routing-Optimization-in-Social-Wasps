@@ -167,6 +167,11 @@ footer label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 footer select { padding: 5px; }
 #perf { display: none; }
 [hidden] { display: none !important; }
+.continuous-results { padding: 28px; max-width: 1100px; }
+.table-scroll { overflow-x: auto; }
+.continuous-results table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.continuous-results th, .continuous-results td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+#hunger-chart { width: 100%; max-width: 600px; }
 @media (max-width: 1100px) {
   header { flex-wrap: wrap; padding: 16px 20px; }
   nav { flex-wrap: wrap; gap: 12px; }

@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { copyFileSync, createReadStream, mkdirSync } from 'node:fs';
-export default defineConfig({ base: './', build: { chunkSizeWarningLimit: 700 },
+export default defineConfig({ base: './', build: { chunkSizeWarningLimit: 700, rollupOptions: {input: {main: 'index.html', continuous: 'continuous.html'}} },
   plugins: [{ name: 'preserved-legacy-replays', configureServer(server) {
     server.middlewares.use((request, response, next) => {
       const match = /^\/legacy\/simulation_(tsp|biased|random|greedy)\.html(?:\?.*)?$/.exec(request.url ?? '');

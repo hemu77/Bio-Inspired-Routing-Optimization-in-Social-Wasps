@@ -9,6 +9,38 @@ A dataset-grounded agent experiment: how do searching workers finish feeding a c
 
 > Research-v3 marks a larva full only when remaining hunger is **at most 0.12**. There is **no three-feed cap**. Hunger, portions and recovery rates are assumptions, not measurements of biological satiation or food mass.
 
+## Continuous Feeding: Hunger Returns
+
+**[Open the continuous experiment](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/continuous.html)**
+
+A separate, fully synthetic experiment adds returning hunger and finite food.
+Full larvae can become hungry again. Workers carry at most two assumed food
+units, return to a depot when empty, and may give only a partial portion.
+External deliveries arrive unpredictably; no worker knows future arrivals.
+The white depot ring identifies where workers collect food. Foragers and their
+trips are not individually simulated.
+
+The comparison contains **180 runs**: six routing policies, three supply
+conditions and ten paired seeds, each observed for 500 ticks. All methods within
+a supply/seed pair receive the same starting colony and delivery schedule.
+The viewer reports current fullness, average hunger, hunger-return events,
+repeat feeds after fullness, food consumed and empty-depot waits. A fixed
+observation window replaces the permanent-completion endpoint.
+
+| Mean hunger across ten seeds; lower is better | Scarce | Variable | Abundant |
+|---|---:|---:|---:|
+| TSP (nearest-neighbour tour) | 0.891 | 0.469 | 0.424 |
+| Random | 0.894 | 0.614 | 0.601 |
+| Local urgency + claims | 0.901 | 0.512 | 0.457 |
+
+These are descriptive results for the stated synthetic assumptions, not fitted
+biological predictions. Low supply limits all policies; additional supply does
+not guarantee sustained fullness because travel and refill actions also cost
+time. The full six-policy table is in the viewer. See
+[the continuous model specification](docs/CONTINUOUS_FEEDING.md) for parameters,
+limitations and reproduction. The original 2,880-run experiment below remains a
+single feeding round with an absorbing full state.
+
 ## Four Methods. One Colony.
 
 **Same nest, same starting hunger, same 28 workers. Different routing decisions.**
@@ -36,7 +68,10 @@ Dark mode covers the entire interface. **Light mode** changes panels, controls, 
 
 Choose **TSP, Biased, Random or Greedy**; local-information extensions are separately disclosed. Comparison shares actual model time and holds completed methods at their final frame. **Next feed** includes repeat feeds. Milestones and the staircase count full larvae, not larvae merely visited once.
 
-Drag to orbit; **Shift-drag or right-drag to pan**. Touch supports two-finger pan/pinch. Mouse-wheel zoom focuses on the pointer within each render region, excluding titles. **Reset view** fits and recenters the nest without resetting playback. Zooming crops the enlarged field by design; pan to inspect its other parts. Controls and legend never overlay rendered agents.
+Drag or two-finger trackpad scroll to orbit around the nest, including underneath;
+**Shift-drag or right-drag pans**. Pinch or Ctrl+scroll zooms toward the orbit
+center. **Reset view** fits and recenters the nest without resetting playback.
+**Expand view** uses the full screen. Controls and legend stay outside the nest.
 
 ![Light-mode feeding round](docs/feeding-light.png)
 
