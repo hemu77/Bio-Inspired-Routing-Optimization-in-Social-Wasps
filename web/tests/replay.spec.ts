@@ -10,7 +10,7 @@ test("beginner flow shows one method, real feeding milestones and provenance", a
   await ready(page);
   await expect(page.locator('.view-label')).toHaveCount(1);
   await expect(page.locator('#coverage')).toHaveAttribute('value', '0');
-  await page.getByRole('button', {name: 'Random walk', exact: true}).click();
+  await page.getByRole('button', {name: 'Random', exact: true}).click();
   await expect(page.locator('#status')).toBeHidden();
   await expect(page.locator('#strategy')).toHaveValue('random');
   await expect(page.locator('.view-label')).toHaveCount(1);
@@ -59,6 +59,8 @@ test('context mismatch cannot display unverified feeding completion', async ({pa
 test('each method filter reaches its recorded end without extra views', async ({page}) => {
   await ready(page, '/?scenario=v87-S06');
   for (const method of ['tsp', 'biased', 'random', 'greedy', 'local_nearest', 'local_urgency_claims']) {
+    if (method.startsWith('local_') && await page.locator('#extra-methods').getAttribute('open') === null)
+      await page.locator('#extra-methods summary').click();
     await page.locator(`[data-method="${method}"]`).click();
     await expect(page.locator('#status')).toBeHidden();
     await expect(page.locator(`[data-method="${method}"]`)).toHaveAttribute('aria-pressed', 'true');
@@ -69,6 +71,50 @@ test('each method filter reaches its recorded end without extra views', async ({
     expect(end.frames[0].tick).toBe(end.tick);
     await expect(page.locator('#remaining')).toContainText('0 waiting');
   }
+});
+
+for (const variant of ['desktop', 'fallback', 'mobile'])
+test(`comparison annotations never overlap rendered regions: ${variant}`, async ({page}) => {
+  if (variant === 'mobile') await page.setViewportSize({width:390,height:844});
+  await ready(page, '/?scenario=v87-S06&compare=1' + (variant === 'fallback' ? '&2d=1' : ''));
+  const boxes = await page.evaluate(() => {
+    const bounds = (element: Element) => {
+      const r = element.getBoundingClientRect();
+      return {x:r.x, y:r.y, right:r.right, bottom:r.bottom};
+    };
+    return {canvas:bounds(document.querySelector('canvas')!),
+      legend:bounds(document.querySelector('#legend')!),
+      controls:bounds(document.querySelector('footer')!),
+      labels:[...document.querySelectorAll('.view-label')].map(bounds),
+      regions:(window as any).labState.regions};
+  });
+  expect(boxes.legend.y).toBeGreaterThanOrEqual(boxes.canvas.bottom);
+  expect(boxes.controls.bottom).toBeLessThanOrEqual(boxes.canvas.y);
+  expect(boxes.regions).toHaveLength(4);
+  for (let i=0; i<4; i++) {
+    const region = boxes.regions[i];
+    expect(boxes.labels[i].bottom).toBeLessThanOrEqual(boxes.canvas.y + region.y);
+    expect(region.h).toBeGreaterThan(100);
+  }
+  await expect(page.locator('#method-filters > button')).toHaveText(['Random', 'Biased', 'Greedy', 'TSP']);
+  expect(await page.locator('.waiting').evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(128, 191, 255)');
+  expect(await page.locator('.fed').evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(81, 181, 161)');
+  expect(await page.locator('.wasp').evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(245, 196, 81)');
+  await page.screenshot({path:`test-results/comparison-${variant}.png`,fullPage:true});
+});
+test('legacy references serve preserved players, not the v2 app shell', async ({page, request}) => {
+  await ready(page, '/?strategy=tsp');
+  await expect(page.locator('#legacy-replay')).toHaveAttribute('href', 'legacy/simulation_tsp.html');
+  for (const method of ['tsp','biased','random','greedy']) {
+    const response = await request.get(`/legacy/simulation_${method}.html`);
+    expect(response.ok()).toBeTruthy();
+    const html = await response.text();
+    expect(html).toContain('new Animation(');
+    expect(html).not.toContain('/src/main.ts');
+  }
+  await page.locator('#strategy').selectOption('local_nearest');
+  await expect(page.locator('#status')).toBeHidden();
+  await expect(page.locator('#legacy-replay')).toBeHidden();
 });
 test("recorded playback, seek and inspector retain camera / hidden pin", async ({
   page,

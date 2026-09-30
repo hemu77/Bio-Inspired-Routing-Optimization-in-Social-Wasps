@@ -67,14 +67,24 @@ this is not total browser RAM. Desktop and portrait screenshots were inspected.
 
 ## Viewer Design Contract
 Warm off-white rails, charcoal viewport, amber workers and teal served larvae.
-Top: research question, scenario and single-method filters. Left: method explanation,
+Top: research question, scenario, single-method filters and actual-tick playback. Left: method explanation,
 data provenance and optional display layers. Center: mapped square cells and workers.
 Right: feeding progress, recorded full-round coverage, events and entity inspection.
-Bottom: actual-tick playback, next-feed navigation, restart, seek and speed.
+Playback is in document flow above the nest, never a sticky overlay.
 Nest depth is illustrative; XY coordinates are exactly simulation coordinates.
-Stage controls body size; priority controls waiting color; served state also changes shape.
+Stage controls body size; waiting larvae are blue, first-fed larvae teal, workers gold.
+Initial priority is numeric in the inspector, not encoded in waiting color.
+Served state also changes shape. Headers and legend are outside render regions.
 No 3D biology is inferred from planar observations. Hidden layers are not pickable;
 pinned hidden entities remain identified. Orbit drags must never become clicks.
 Comparison uses one renderer with scissor views, not four WebGL contexts.
 The concept's hexagonal geometry and invented inspector fields are intentionally
 not implemented: the scientific coordinate/action contract takes precedence.
+
+## Two-Reviewer Repair
+- [x] Thirteen browser tests pass, including overlap and palette checks in desktop, 2D and portrait comparisons, and preserved-player delivery.
+- [x] Three inventories and all 36 bout summaries exactly match local source preprocessing.
+- [x] Four preserved legacy players included unchanged in production output.
+- [x] V2 versus prototype behavior explicitly separated; no claim that the live replay preserves the original satiation model.
+
+Details and remaining scientific limits: [review panel](REVIEW_PANEL.md).

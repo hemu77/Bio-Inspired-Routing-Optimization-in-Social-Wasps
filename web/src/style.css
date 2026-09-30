@@ -57,30 +57,42 @@ details code { font: 11px/1.5 "IBM Plex Mono", monospace; }
 .opacity { display: flex; flex-direction: column; gap: 5px; font-size: 14px; }
 a { color: #236f62; text-underline-offset: 3px; }
 .report-link { display: block; margin-top: 24px; font-size: 14px; }
-.viewport { position: relative; min-width: 0; min-height: 0; background: #20282b; color: #f1efe7; overflow: hidden; }
-#canvas { position: absolute; inset: 0; }
+.viewport { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #20282b; color: #f1efe7; overflow: hidden; }
+#canvas { position: relative; flex: 1; min-height: 0; }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.view-tools { position: absolute; right: 16px; top: 16px; display: flex; align-items: center; gap: 8px; z-index: 2; }
+.view-tools { position: static; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 14px; min-height: 52px; border-bottom: 1px solid #42514f; }
 .view-tools button { color: #f1efe7; background: #293739; border-color: #647571; font-size: 13px; }
 .view-tools button:hover { background: #40524e; }
 #mode { display: none; }
-#view-labels { position: absolute; inset: 67px 20px 78px; pointer-events: none; display: grid; gap: 6px; }
-.view-label { display: flex; flex-direction: column; align-items: flex-start; }
+#view-labels { position: absolute; inset: 0; pointer-events: none; display: grid; }
+.view-label { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 14px; height: 58px; }
 .view-label strong { font-weight: 600; font-size: 21px; }
 .view-label span { font: 12px/1.7 "IBM Plex Mono", monospace; color: #c9d5d1; }
-.view-label.focused strong { color: #efca81; }
+.view-label.focused strong { color: #ffffff; }
 #view-labels.four { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+#view-labels.four .view-label { border-top: 1px solid #42514f; border-right: 1px solid #42514f; }
 #view-labels.four strong { font-size: 17px; }
 #view-labels.four span { font-size: 10px; }
-.legend { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 9px 12px; background: #20282bed; font-size: 13px; }
+.legend { position: static; display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; background: #172124; border-top: 1px solid #42514f; font-size: 13px; flex-shrink: 0; }
 .legend span { display: flex; align-items: center; gap: 7px; }
 .legend i { width: 11px; height: 11px; display: inline-block; border-radius: 50%; }
-.waiting { background: #d0804c; }
-.fed { background: var(--teal); transform: scaleY(.6); }
-.wasp { background: var(--amber); border: 2px solid #372d23; width: 17px !important; }
+.waiting { background: var(--replay-waiting); }
+.fed { background: var(--replay-fed); transform: scaleY(.6); }
+.wasp { background: var(--replay-worker); border: 2px solid #172124; width: 17px !important; border-radius: 0 !important; }
 #status { position: absolute; top: 45%; left: 10%; right: 10%; padding: 20px; background: #20282bf5; border: 1px solid #789489; text-align: center; }
 #hover { position: absolute; bottom: 90px; left: 20px; font: 13px "IBM Plex Mono", monospace; padding: 8px; background: #192221; }
-#feed-caption { position: absolute; bottom: 64px; left: 20px; right: 20px; font-size: 12px; line-height: 1.5; color: #d2e3dc; pointer-events: none; }
+#feed-caption { position: static; order: 1; padding: 8px 16px; font-size: 12px; line-height: 1.5; color: #d2e3dc; pointer-events: none; }
+#legend { order: 2; }
+#method-filters, #extension-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+#extra-methods { margin-top: 10px; padding-top: 8px; }
+#extension-filters { margin-top: 8px; }
+main.comparing { height: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+main.comparing .viewport { grid-column: 1 / -1; grid-row: 1; height: 760px; }
+main.comparing .layers, main.comparing .inspector { max-height: 360px; border-top: 1px solid var(--line); }
+.model-note { font-size: 13px; color: #815333; margin: 0 0 10px; }
+#view-labels.four.stacked { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+#view-labels.four.stacked strong { font-size: 18px; }
+#view-labels.four.stacked span { font-size: 11px; }
 #cycle-state { font-size: 23px; margin-bottom: 12px; }
 #fed-count { display: block; font-size: 37px; font-weight: 600; letter-spacing: -1px; line-height: 1.2; }
 progress { display: block; width: 100%; height: 9px; border: 0; margin: 14px 0 8px; accent-color: #267c6d; }
@@ -107,7 +119,7 @@ dt { color: var(--muted); }
 dd { margin: 0; font: 11px/1.6 "IBM Plex Mono", monospace; overflow-wrap: anywhere; }
 #overlap button { margin: 2px; font-size: 12px; }
 .hidden-note { color: #8b4d29 !important; }
-footer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); background: var(--paper); z-index: 3; flex-wrap: wrap; }
+footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--paper); flex-wrap: wrap; }
 #play { background: var(--ink); border-color: var(--ink); color: white; min-width: 70px; }
 #restart, #next-feed { font-size: 14px; }
 .timeline { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 230px; }
@@ -138,15 +150,17 @@ footer select { padding: 5px; }
   #method-filters { gap: 6px; }
   #method-filters button { font-size: 13px; padding: 6px 9px; }
   main { display: flex; flex-direction: column; height: auto; }
-  .viewport { order: 1; min-height: 480px; height: 62dvh; }
+  .viewport { order: 1; min-height: 600px; height: 75dvh; }
+  main.comparing { height: auto; }
+  main.comparing .viewport { height: 1500px; }
   .inspector { order: 2; border: 0; padding: 24px 20px; }
   .layers { order: 3; border: 0; border-top: 1px solid var(--line); padding: 24px 20px; }
   .cycle-chart { max-width: 420px; }
   #fed-count { font-size: 36px; }
   .legend { font-size: 11px; gap: 8px; left: 8px; right: 8px; }
-  #feed-caption { font-size: 11px; left: 14px; right: 14px; bottom: 68px; }
+  #feed-caption { font-size: 11px; }
   .view-tools { top: 12px; right: 12px; }
-  #view-labels { inset: 64px 14px 70px; }
+  #view-labels { inset: 0; }
   #view-labels.four strong { font-size: 13px; }
   #view-labels.four span { font-size: 8px; }
   footer { padding: 10px 12px; gap: 8px; }

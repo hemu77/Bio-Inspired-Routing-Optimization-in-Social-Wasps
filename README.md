@@ -9,13 +9,15 @@ An agent-based project asking how movement, local information and worker coordin
 
 > Research-v2 measures **first-feed coverage**, not satiation. Random initial hunger is an assumed priority, not measured physiology. Depth is illustrative; XY comes from the mapped simulation.
 
+**Version boundary:** the live lab is an adapted research-v2 model, not the original notebook rendered in 3D. It changes movement/action timing, targeting and the feeding endpoint. Familiar `TSP`, `Biased`, `Random` and `Greedy` names identify the policy families, not identical implementations. The two local-information methods are explicitly labeled extensions. [Two-reviewer findings and fixes](docs/REVIEW_PANEL.md) document that distinction.
+
 ![Single-method feeding-round replay](docs/lab-preview.png)
 
 ## Read The Replay
 
-Start with one method. The method buttons switch the rule while retaining the selected nest-bout scenario; the original four-way comparison remains opt-in. The left explanation tells you what that method can know. A single replay illustrates a mechanism, not the overall ranking.
+Start with TSP. The four baseline method buttons switch the rule while retaining the selected nest-bout scenario; comparison remains opt-in. Additional research methods live under a separate disclosure. The left explanation tells you what each method can know. A single replay illustrates a mechanism, not the overall ranking.
 
-Press **Next feed** to jump to a recorded feeding event and outline that larva in white. **Play** follows every stored tick; **Restart** returns to the same starting state. Amber/coral larvae are waiting; teal larvae have received their first feed. The body-shape change is a display cue, not a physiological observation.
+Press **Next feed** to jump to a recorded feeding event and outline that larva in white. **Play** follows every stored tick; **Restart** returns to the same starting state. Blue larvae are waiting; teal, flattened larvae have received their first feed; gold workers have a segmented body. The same colors apply to 3D, fallback and the legend. Color and shape are redundant cues, not physiological observations. Playback controls, panel titles and legends occupy their own space, never the rendered nest.
 
 The coverage chart shows the complete recorded round: horizontal position is actual model time, vertical position is first-feed coverage. Its cursor marks the current frame. Coverage milestones jump to the first tick reaching 0%, 25%, 50%, 75% or 100%; they are navigation buttons, not the chart's time-axis labels. The final count and completion tick come from the trace, never a cosmetic animation stop.
 
@@ -48,13 +50,15 @@ Two private files are needed only to regenerate experiments:
 | v72 | 14 | 53 | 106 | 25 |
 | v87 | 12 | 67 | 134 | 28 |
 
-The inherited event grouping (`FL`, `FL2`, `LPL`, `SPL`) is an **assumed activity proxy** for resource scaling until a behavioral codebook is confirmed. Public scenarios use ordinal labels such as `v87-S06`; original bout labels and worker identities are not exported. Derived summaries and selected synthetic traces are public. **Raw CSV datasets are not published.**
+The inherited event grouping (`FL`, `FL2`, `LPL`, `SPL`) is an **assumed activity proxy** for worker-count scaling until a behavioral codebook is confirmed. It does not supply food resources or simulated feeding events. Public scenarios use ordinal labels such as `v87-S06`; original bout labels and worker identities are not exported. Derived summaries and selected synthetic traces are public. **Raw CSV datasets are not published.**
+
+The 2026-09-30 local audit rebuilt preprocessing from both private CSV files and verified exact equality of all 36 exported bout summaries and the three nest inventories with the saved report. This verifies local source grounding, not biological accuracy. Public readers cannot independently audit the withheld raw files. The source digest identifies Python code; it is not a checksum of the private datasets or every exported browser asset.
 
 ## Modeling Approach
 
 An agent-based model tracks individual larvae and workers. Larvae remain in cells; workers move on a bounded square grid. All workers can feed. Food availability, role specialization and foraging trips are outside this experiment. Background cells remain traversable.
 
-One activation permits one cardinal move, one first feed at the current cell, **or** one claim broadcast. Feeding and broadcasting replace movement; neither is free. Initialization, scheduling and policy choices use independent random streams. Policies inside a scenario-replicate receive the same colony, resources, grid and scheduler seed. Extra policy random draws cannot change activation order.
+One activation permits one cardinal move, one first feed at the current cell, **or** one claim broadcast. Feeding and broadcasting replace movement; neither is free. Initialization, scheduling and policy choices use independent random streams. Policies inside a scenario-replicate receive the same colony, worker count, grid and scheduler seed. Extra policy random draws cannot change activation order.
 
 Unfinished runs have `completion_step: null` and `stop_reason: "horizon"`. Horizon-capped time includes failures at 3,000; travel is measured in cardinal grid units, not metabolic energy. Restricted waiting ends at first feed or the censoring horizon.
 
@@ -124,12 +128,14 @@ Six layers control nest structure, larvae, workers, routes/targets, sensing and 
 | `validate_research.py` | Counts, pairing, provenance and replay/result consistency |
 | `export_viewer_context.py` | Small selected-scenario metadata export, checked against saved results and all 24 traces |
 | `web/` | TypeScript, Vite, Three.js workstation and browser checks |
-| `wasp_routing_analysis.py` | Unchanged legacy engine and reused preprocessing/placement |
+| `wasp_routing_analysis.py` | Legacy-derived baseline helper and reused preprocessing/placement; not identical to every prototype cell |
 | `final_analysis.ipynb` | Previous report, retained as legacy |
 
 The original four GIF/HTML exports remain in `animations/` and belong to **legacy-v1**, not the new endpoint. GitHub sanitizes notebook JavaScript/iframes: open the live lab for v2 playback. Local Jupyter renders the live iframe embeds.
 
-**Play the four original methods with research-v2 rules:** [NN tour](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=tsp), [persistent walk](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=biased), [random walk](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=random), [global weighted choice](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=greedy), or [synchronized comparison](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&compare=1).
+**Play the adapted research-v2 baselines:** [TSP](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=tsp), [Biased](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=biased), [Random](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=random), [Greedy](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&strategy=greedy), or [synchronized comparison](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/?scenario=v87-S06&compare=1).
+
+**Preserved legacy HTML players, unchanged:** [TSP](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_tsp.html), [Biased](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_biased.html), [Random](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_random.html), [Greedy](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/legacy/simulation_greedy.html). These are frozen notebook-era exports with their own endpoint and sampling; do not compare their time or completion percentages directly with v2. They load only when opened, not into the 3D viewer's memory.
 
 ## Run Locally
 

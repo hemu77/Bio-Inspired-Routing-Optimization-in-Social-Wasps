@@ -1,5 +1,5 @@
 import "./style.css";
-import { ReplayScene, Entity } from "./scene";
+import { ReplayScene, Entity, replayColors } from "./scene";
 import { Manifest, Trace, labels, loadTrace, frameAt } from "./trace";
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -11,6 +11,21 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <footer><button id="play" aria-label="Play replay">Play</button><button id="restart" title="Return to tick zero">Restart</button><button id="next-feed" title="Jump to the next tick with a recorded first feed">Next feed</button><label class="timeline">Tick <output id="tick">0</output><input id="seek" aria-label="Seek actual tick" type="range" min="0" max="1" value="0" step="1"></label><label>Speed <select id="speed" aria-label="Playback speed"><option value="10" selected>10 ticks/s</option><option value="30">30 ticks/s</option><option value="100">100 ticks/s</option></select></label><span id="perf"></span></footer>`;
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
+// Playback stays in document flow, never over the lower comparison panels.
+document.querySelector("main")!.before(document.querySelector("footer")!);
+for (const [key, value] of Object.entries(replayColors)) document.documentElement.style.setProperty(`--replay-${key}`, value);
+document.querySelector("nav .compare")!.lastChild!.textContent = " Compare four v2 baselines";
+const modelNote = document.createElement("p");
+modelNote.className = "model-note";
+modelNote.textContent = "Research-v2: adapted TSP, Biased, Random and Greedy rules. Not the original notebook's trajectories or satiation model.";
+document.querySelector(".method-bar")!.prepend(modelNote);
+const reference = document.createElement("a");
+reference.id = "legacy-replay";
+reference.className = "report-link";
+reference.target = "_blank";
+reference.rel = "noreferrer";
+reference.textContent = "Open preserved legacy simulation";
+$("method-explanation").after(reference);
 const axis = document.createElement("div");
 axis.id = "cycle-axis";
 $("milestones").before(axis);
@@ -26,6 +41,12 @@ $("population").after(scopeNote);
 const feedCaption = document.createElement("div");
 feedCaption.id = "feed-caption";
 $("canvas").after(feedCaption);
+// Titles belong to each panel header, not to its rendered nest area.
+$("canvas").append($("view-labels"));
+const extensions = document.createElement("details");
+extensions.id = "extra-methods";
+extensions.innerHTML = '<summary>Research-v2 extensions (not original methods)</summary><div id="extension-filters"></div>';
+$("method-filters").after(extensions);
 const scenario = $<HTMLSelectElement>("scenario"),
   strategy = $<HTMLSelectElement>("strategy"),
   compare = $<HTMLInputElement>("compare"),
@@ -68,17 +89,21 @@ $<HTMLInputElement>("opacity").oninput = (e) => {
   scene.layers.opacity = Number((e.target as HTMLInputElement).value) / 100;
   scene.changed = true;
 };
-for (const [value, label] of Object.entries(labels)) {
-  strategy.add(new Option(label, value));
+for (const [title, extended] of [["Adapted v2 baselines", false], ["Research-v2 extensions", true]] as const) {
+  const group = document.createElement("optgroup");
+  group.label = title;
+  for (const [value, label] of Object.entries(labels))
+    if (value.startsWith("local_") === extended) group.append(new Option(label, value));
+  strategy.append(group);
 }
-strategy.value = "local_nearest";
+strategy.value = "tsp";
 const methodDescriptions: Record<string, string> = {
   random: "No knowledge of larval locations. Each move chooses a random grid direction. A worker feeds when it happens to reach a waiting larva.",
   biased: "No knowledge of larval locations. Workers tend to keep moving in the same direction, with a 25% chance to redraw it each move.",
   tsp: "Knows the whole colony. Each worker follows a nearest-neighbour tour. This historical TSP label does not mean an optimal route.",
-  greedy: "Knows the whole colony. Chooses targets randomly, weighted toward higher initial hunger and shorter distance; it is not a deterministic nearest-target rule.",
+  greedy: "Knows the whole colony. Chooses targets randomly, weighted toward higher initial stage-random priority and shorter distance; it is not a deterministic nearest-target rule.",
   local_nearest: "Sees nearby cells within three grid moves, and remembers observations. Chooses the nearest known waiting larva; explores when none is known.",
-  local_urgency_claims: "Sees nearby cells and remembers observations. Balances initial hunger against distance, then broadcasts short-lived target claims to nearby workers. Communication consumes a turn.",
+  local_urgency_claims: "Sees nearby cells and remembers observations. Balances initial stage-random priority against distance, then broadcasts short-lived target claims to nearby workers. Communication consumes a turn.",
 };
 for (const [value, label] of Object.entries(labels)) {
   const button = document.createElement("button");
@@ -91,7 +116,7 @@ for (const [value, label] of Object.entries(labels)) {
     strategy.disabled = false;
     load();
   };
-  $("method-filters").append(button);
+  $(value.startsWith("local_") ? "extension-filters" : "method-filters").append(button);
 }
 type ScenarioContext = {observed_rows: number; observed_feeding_events: number; observed_unique_cells: number; observed_unique_wasps: number; scaled_larvae: number; n_wasps: number; grid_size: number};
 let contexts: {source_checksum: string; scenarios: Record<string, ScenarioContext>};
@@ -139,6 +164,7 @@ async function load() {
   const controller = abort;
   loading = true;
   pause();
+  document.querySelector("main")!.classList.toggle("comparing", compare.checked);
   $("canvas").style.visibility = "hidden";
   feedCaption.hidden = true;
   $("view-labels").replaceChildren();
@@ -168,9 +194,11 @@ async function load() {
     seek.value = "0";
     pin(null);
     $("population").textContent = `${context.scaled_larvae} synthetic larvae / ${context.n_wasps} simulated workers / ${context.grid_size} x ${context.grid_size} grid`;
-    $("scenario-context").textContent = `${context.observed_rows} recorded rows; ${context.observed_feeding_events} grouped activity events; ${context.observed_unique_cells} observed cells; ${context.observed_unique_wasps} observed workers. These bout counts set resources; they are not the simulation's feeding events. Activity grouping remains an assumption pending a codebook.`;
+    $("scenario-context").textContent = `${context.observed_rows} recorded rows; ${context.observed_feeding_events} grouped activity events; ${context.observed_unique_cells} observed cells; ${context.observed_unique_wasps} observed workers. These summaries set an assumed simulated worker count, not food resources or simulated feeds. Activity grouping remains an assumption pending a codebook. The source-code check is not independent verification of private raw datasets.`;
+    reference.hidden = compare.checked || strategy.value.startsWith("local_");
+    reference.href = `legacy/simulation_${strategy.value}.html`;
     $("method-name").textContent = compare.checked ? "Four baseline methods" : labels[strategy.value];
-    $("method-explanation").textContent = compare.checked ? "Same colony, resources and paired seed. All views share the same actual tick. Completed methods hold their last state. Select a method above to return to one clear view." : methodDescriptions[strategy.value];
+    $("method-explanation").textContent = compare.checked ? "Same synthetic colony, assumed worker count and paired seed. Four adapted v2 policies share the same actual tick. Completed methods hold their last state. They are not the original notebook's feeding-cycle model." : methodDescriptions[strategy.value];
     $("canvas").style.visibility = "visible";
     updateLabels();
     updateInspector();
@@ -211,6 +239,7 @@ function updateLabels() {
   const host = $("view-labels");
   host.replaceChildren();
   host.classList.toggle("four", traces.length === 4);
+  host.classList.toggle("stacked", traces.length === 4 && $("canvas").clientWidth < 600);
   host.hidden = !scene.layers.annotations;
   $("legend").hidden = !scene.layers.annotations;
   traces.forEach((trace, i) => {
@@ -220,7 +249,7 @@ function updateLabels() {
     const title = document.createElement("strong"),
       line = document.createElement("span");
     title.textContent = labels[trace.strategy];
-    line.textContent = `${trace.scenario} / ${frame.fed}/${trace.larvae.length} served / tick ${frame.tick}${frame.fed === trace.larvae.length ? " / COMPLETE" : ""}`;
+    line.textContent = `${frame.fed}/${trace.larvae.length} fed / tick ${frame.tick}${frame.fed === trace.larvae.length ? " / COMPLETE" : ""}`;
     label.append(title, line);
     if (i === focused) label.classList.add("focused");
     host.append(label);
@@ -562,5 +591,6 @@ Object.defineProperty(window, "labState", {
     frames: traces.map((t) => frameAt(t, tick)),
     measuredFps,
     renderer: scene.renderer?.info.memory,
+    regions: traces.map((_, i) => scene.region(i)),
   }),
 });

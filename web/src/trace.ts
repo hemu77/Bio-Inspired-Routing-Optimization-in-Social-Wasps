@@ -47,10 +47,10 @@ export type Manifest = {
   }[];
 };
 export const labels: Record<string, string> = {
-  random: "Random walk",
-  biased: "Persistent walk",
-  greedy: "Global weighted choice",
-  tsp: "Global NN tour",
+  random: "Random",
+  biased: "Biased",
+  greedy: "Greedy",
+  tsp: "TSP",
   local_nearest: "Local nearest",
   local_urgency_claims: "Local urgency + claims",
 };

@@ -28,8 +28,8 @@ type View = {
   marker: THREE.Mesh;
   trace: Trace;
 };
-const teal = new THREE.Color("#51b5a1"),
-  amber = new THREE.Color("#d9a148");
+export const replayColors = {waiting: "#80bfff", fed: "#51b5a1", worker: "#f5c451"};
+const teal = new THREE.Color(replayColors.fed), waiting = new THREE.Color(replayColors.waiting);
 export class ReplayScene {
   renderer: THREE.WebGLRenderer | null = null;
   canvas: HTMLCanvasElement;
@@ -93,13 +93,19 @@ export class ReplayScene {
       this.canvas.width = width * Math.min(devicePixelRatio, 1.5);
       this.canvas.height = height * Math.min(devicePixelRatio, 1.5);
     }
-    for (const view of this.views) {
-      view.camera.aspect =
-        width /
-        (this.views.length === 4 ? 2 : 1) /
-        (height / (this.views.length === 4 ? 2 : 1));
+    for (const [i, view] of this.views.entries()) {
+      const region = this.region(i);
+      view.camera.aspect = region.w / region.h;
       view.camera.updateProjectionMatrix();
     }
+  }
+  // One layout contract for renderers and picking: panel titles get real space.
+  region(index: number) {
+    const columns = this.traces.length === 4 && this.host.clientWidth >= 600 ? 2 : 1;
+    const rows = Math.max(1, Math.ceil(this.traces.length / columns));
+    const width = this.host.clientWidth / columns, height = this.host.clientHeight / rows;
+    return {x: (index % columns) * width + 8, y: Math.floor(index / columns) * height + 58,
+      w: Math.max(1, width - 16), h: Math.max(1, height - 66)};
   }
   dispose() {
     for (const view of this.views) {
@@ -129,8 +135,8 @@ export class ReplayScene {
   }
   private createView(trace: Trace, index: number): View {
     const scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight("#fff2d3", "#26373e", 2));
-    const sun = new THREE.DirectionalLight("#fff0cc", 2);
+    scene.add(new THREE.HemisphereLight("#ffffff", "#26373e", 2));
+    const sun = new THREE.DirectionalLight("#ffffff", 2);
     sun.position.set(4, 12, 8);
     scene.add(sun);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 250);
@@ -207,7 +213,7 @@ export class ReplayScene {
     structure.add(walls);
     const larvae = new THREE.InstancedMesh(
       new THREE.SphereGeometry(1, 10, 7),
-      new THREE.MeshStandardMaterial({ roughness: 0.6 }),
+      new THREE.MeshBasicMaterial(),
       trace.larvae.length,
     );
     larvae.userData.kind = "larva";
@@ -219,9 +225,9 @@ export class ReplayScene {
     const wasps = [0, 1, 2, 3, 4].map((segment) => {
       const mesh = new THREE.InstancedMesh(
         new THREE.SphereGeometry(1, 8, 6),
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshBasicMaterial({
           color:
-            segment === 0 ? "#dda549" : segment < 3 ? "#372d23" : "#cbd1c3",
+            segment < 3 ? replayColors.worker : "#fff6d8",
           transparent: segment >= 3,
           opacity: segment >= 3 ? 0.6 : 1,
         }),
@@ -283,9 +289,12 @@ export class ReplayScene {
       this.draw2d(tick);
       return;
     }
-    this.renderer.setScissorTest(true);
     const width = this.host.clientWidth,
       height = this.host.clientHeight;
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, width, height);
+    this.renderer.clear();
+    this.renderer.setScissorTest(true);
     this.views.forEach((view, i) => {
       const trace = view.trace,
         frame =
@@ -313,9 +322,7 @@ export class ReplayScene {
         );
         view.larvae.setColorAt(
           j,
-          served
-            ? teal
-            : amber.clone().lerp(new THREE.Color("#c35f42"), larva.hunger),
+          served ? teal : waiting,
         );
       });
       view.larvae.instanceMatrix.needsUpdate = true;
@@ -428,12 +435,7 @@ export class ReplayScene {
           view.sensing.add(footprint);
         }
       }
-      const columns = this.views.length === 4 ? 2 : 1,
-        rows = columns,
-        w = width / columns,
-        h = height / rows,
-        x = (i % columns) * w,
-        y = height - (Math.floor(i / columns) + 1) * h;
+      const {x, y: top, w, h} = this.region(i), y = height - top - h;
       view.camera.aspect = w / h;
       view.camera.updateProjectionMatrix();
       if (i > 0) {
@@ -447,20 +449,21 @@ export class ReplayScene {
     this.changed = false;
   }
   pick(clientX: number, clientY: number, tick: number): Entity | null {
-    const rect = this.canvas.getBoundingClientRect(),
-      columns = this.traces.length === 4 ? 2 : 1;
-    const x = clientX - rect.left,
-      y = clientY - rect.top,
-      w = rect.width / columns,
-      h = rect.height / columns;
-    const index = Math.floor(y / h) * columns + Math.floor(x / w),
-      trace = this.traces[index];
+    const rect = this.canvas.getBoundingClientRect();
+    const x = clientX - rect.left, y = clientY - rect.top;
+    const index = this.traces.findIndex((_, i) => {
+      const r = this.region(i);
+      return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+    });
+    const trace = this.traces[index];
     if (!trace) return null;
+    const region = this.region(index), localX = x - region.x, localY = y - region.y;
+    const {w, h} = region;
     const f = trace.frames[Math.min(Math.floor(tick), trace.frames.length - 1)];
     if (!this.renderer) {
       const scale = (Math.min(w, h) * 0.83) / trace.grid_size;
-      const gx = ((x % w) - w / 2) / scale + trace.grid_size / 2,
-        gy = ((y % h) - h / 2) / scale + trace.grid_size / 2;
+      const gx = (localX - w / 2) / scale + trace.grid_size / 2,
+        gy = (localY - h / 2) / scale + trace.grid_size / 2;
       const near = (p: XY) => Math.hypot(p[0] - gx, p[1] - gy) < 0.55;
       if (this.layers.wasps) {
         const i = f.positions.findIndex(near);
@@ -479,7 +482,7 @@ export class ReplayScene {
     }
     const view = this.views[index];
     this.ray.setFromCamera(
-      new THREE.Vector2(((x % w) / w) * 2 - 1, (-(y % h) / h) * 2 + 1),
+      new THREE.Vector2((localX / w) * 2 - 1, -(localY / h) * 2 + 1),
       view.camera,
     );
     const meshes: THREE.Object3D[] = [];
@@ -530,19 +533,20 @@ export class ReplayScene {
       height = this.host.clientHeight;
     ctx.fillStyle = "#20282b";
     ctx.fillRect(0, 0, width, height);
-    const columns = this.traces.length === 4 ? 2 : 1;
     this.traces.forEach((trace, i) => {
       const frame =
           trace.frames[Math.min(Math.floor(tick), trace.frames.length - 1)],
-        w = width / columns,
-        h = height / columns,
+        {x, y, w, h} = this.region(i),
         scale = (Math.min(w, h) * 0.83) / trace.grid_size;
       const project = (p: XY): XY => [
-        (i % columns) * w + w / 2 + (p[0] - trace.grid_size / 2) * scale,
-        Math.floor(i / columns) * h +
-          h / 2 +
+        x + w / 2 + (p[0] - trace.grid_size / 2) * scale,
+        y + h / 2 +
           (p[1] - trace.grid_size / 2) * scale,
       ];
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
       if (this.layers.structure) {
         ctx.strokeStyle = "#5e6e6b";
         ctx.globalAlpha = this.layers.opacity;
@@ -592,7 +596,7 @@ export class ReplayScene {
           const p = project(l.xy),
             fed = frame.first_feed[j] >= 0;
           const radius = {L1: .16, L2: .23, L3: .29}[l.stage] || .2;
-          ctx.fillStyle = fed ? "#51b5a1" : `#${amber.clone().lerp(new THREE.Color("#c35f42"), l.hunger).getHexString()}`;
+          ctx.fillStyle = fed ? replayColors.fed : replayColors.waiting;
           ctx.beginPath();
           ctx.ellipse(
             ...p,
@@ -607,7 +611,7 @@ export class ReplayScene {
       if (this.layers.wasps)
         frame.positions.forEach((p) => {
           const xy = project(p);
-          ctx.fillStyle = "#e7b650";
+          ctx.fillStyle = replayColors.worker;
           ctx.fillRect(
             xy[0] - scale * 0.2,
             xy[1] - scale * 0.12,
@@ -624,6 +628,7 @@ export class ReplayScene {
         ctx.stroke();
         ctx.lineWidth = 1;
       }
+      ctx.restore();
     });
     this.changed = false;
   }
