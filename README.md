@@ -17,17 +17,29 @@ A separate, fully synthetic experiment adds returning hunger and finite food.
 Full larvae can become hungry again. Workers carry at most two assumed food
 units, return to a depot when empty, and may give only a partial portion.
 External deliveries arrive unpredictably; no worker knows future arrivals.
-The white depot ring identifies where workers collect food. Foragers and their
+The contrasting depot ring identifies where workers collect food. Foragers and their
 trips are not individually simulated.
 
-The comparison contains **180 runs**: six routing policies, three supply
-conditions and ten paired seeds, each observed for 500 ticks. All methods within
-a supply/seed pair receive the same starting colony and delivery schedule.
+The comparison contains **540 runs**: three colony sizes, six routing policies,
+three supply conditions and ten paired seeds, each observed for 500 ticks.
+All methods within a size/supply/seed combination receive the same starting
+colony and delivery schedule. The viewer opens on the large colony.
+
+| Environment | Larvae | Feeding workers | Grid |
+|---|---:|---:|---:|
+| Small | 36 | 12 | 12 x 12 |
+| Medium | 108 | 36 | 21 x 21 |
+| Large | 324 | 108 | 36 x 36 |
+
+Worker-to-larva ratio and delivered food per larva remain constant. Occupancy of
+the whole grid is about 25%, but occupancy of eligible interior cells decreases
+from 36.4% to 30.0% to 28.1%; journeys to the single depot also grow longer.
+This is a controlled synthetic scaling study, not 540 independent real colonies.
 The viewer reports current fullness, average hunger, hunger-return events,
 repeat feeds after fullness, food consumed and empty-depot waits. A fixed
 observation window replaces the permanent-completion endpoint.
 
-| Mean hunger across ten seeds; lower is better | Scarce | Variable | Abundant |
+| Small colony: mean hunger across ten seeds; lower is better | Scarce | Variable | Abundant |
 |---|---:|---:|---:|
 | TSP (nearest-neighbour tour) | 0.891 | 0.469 | 0.424 |
 | Random | 0.894 | 0.614 | 0.601 |
@@ -36,7 +48,10 @@ observation window replaces the permanent-completion endpoint.
 These are descriptive results for the stated synthetic assumptions, not fitted
 biological predictions. Low supply limits all policies; additional supply does
 not guarantee sustained fullness because travel and refill actions also cost
-time. The full six-policy table is in the viewer. See
+time. The viewer compares all six policies across all three sizes, with ten-seed
+ranges for hunger, fullness, movement per larva, waiting and runtime. It loads
+only the selected replay; medium and large traces are compressed. The exporter
+runs sequentially on one logical CPU at below-normal priority on Windows. See
 [the continuous model specification](docs/CONTINUOUS_FEEDING.md) for parameters,
 limitations and reproduction. The original 2,880-run experiment below remains a
 single feeding round with an absorbing full state.

@@ -7,20 +7,26 @@ from __future__ import annotations
 
 import hashlib
 import json
+import gzip
+import time
+import os
 from pathlib import Path
 import numpy as np
 from research_model import ResearchModel, STRATEGIES, MOVES, SATIATION_THRESHOLD, HUNGER_GROWTH, FEED_DROP
 
 SUPPLIES = {"scarce": (.08, 1., 3.), "variable": (.20, 2., 6.), "abundant": (.40, 3., 7.)}
 VERSION = "continuous-synthetic-v1"
+ENVIRONMENTS = {"small": (36, 12, 12), "medium": (108, 36, 21), "large": (324, 108, 36)}
 
 
 class ContinuousModel(ResearchModel):
-    def __init__(self, *args, supply="variable", initial_stock=6., capacity=2., **kwargs):
+    def __init__(self, *args, supply="variable", initial_stock=6., capacity=2., supply_scale=1., **kwargs):
         super().__init__(*args, **kwargs)
-        if supply not in SUPPLIES or not np.isfinite(initial_stock) or initial_stock < 0 or not np.isfinite(capacity) or capacity <= 0:
+        if supply not in SUPPLIES or not np.isfinite(initial_stock) or initial_stock < 0 or not np.isfinite(capacity) or capacity <= 0 or not np.isfinite(supply_scale) or supply_scale <= 0:
             raise ValueError("Invalid food supply or capacity")
         self.supply, self.capacity = supply, float(capacity)
+        self.supply_scale = float(supply_scale)
+        self.tour_distances = None
         self.initial_stock = self.stock = float(initial_stock)
         self.delivered = self.consumed = 0.
         self.loads = np.zeros(self.n_wasps)
@@ -32,6 +38,21 @@ class ContinuousModel(ResearchModel):
         self.ever_full = self.hunger <= SATIATION_THRESHOLD
         self.empty_waits = 0
         self.seen_at = [{} for _ in range(self.n_wasps)]
+
+    def choose_target(self, worker):
+        if self.strategy == "tsp" and not self.queues[worker]:
+            # Same nearest-neighbour order and index tie-break as the original loop.
+            if self.tour_distances is None:
+                self.tour_distances = np.abs(self.larvae[:, None] - self.larvae[None, :]).sum(axis=2)
+            left = np.flatnonzero(self.satiated_at < 0)
+            distances = np.abs(self.larvae - self.positions[worker]).sum(axis=1)
+            while len(left):
+                chosen_at = int(np.argmin(distances[left]))
+                chosen = int(left[chosen_at])
+                self.queues[worker].append(chosen)
+                left = np.delete(left, chosen_at)
+                distances = self.tour_distances[chosen]
+        return super().choose_target(worker)
 
     def observe(self, worker):
         # Old observations must not make a previously full larva permanently invisible.
@@ -72,7 +93,7 @@ class ContinuousModel(ResearchModel):
                     queue.extend(int(i) for i in np.flatnonzero(reopened) if i not in queue)
         probability, low, high = SUPPLIES[self.supply]
         # Arrivals are external foraging deliveries, not simulated forager agents.
-        arrival = float(self.delivery_rng.uniform(low, high)) if self.delivery_rng.random() < probability else 0.
+        arrival = float(self.delivery_rng.uniform(low, high)) * self.supply_scale if self.delivery_rng.random() < probability else 0.
         self.stock += arrival
         self.delivered += arrival
         self.delivery_this_tick = arrival
@@ -147,23 +168,29 @@ class ContinuousModel(ResearchModel):
                 "empty_waits": int(self.empty_waits)}
 
 
-def synthetic_colony(seed=42):
+def synthetic_colony(seed=42, environment="small"):
+    if environment not in ENVIRONMENTS:
+        raise ValueError("Unknown environment")
+    count, _, size = ENVIRONMENTS[environment]
     rng = np.random.default_rng(seed)
     # Independent geometry, not jittered or reconstructed from the supplied nests.
-    cells = [(x, y) for x in range(1, 11) for y in range(1, 11) if (x, y) != (6, 6)]
-    xy = np.array(cells)[rng.choice(len(cells), 36, replace=False)]
-    stages = np.array(["L1", "L2", "L3"] * 12)
+    cells = [(x, y) for x in range(1, size-1) for y in range(1, size-1) if (x, y) != (size//2, size//2)]
+    xy = np.array(cells)[rng.choice(len(cells), count, replace=False)]
+    stages = np.array(["L1", "L2", "L3"] * (count//3))
     rng.shuffle(stages)
     ranges = {"L1": (.2, .5), "L2": (.45, .75), "L3": (.65, 1.)}
     hunger = np.array([rng.uniform(*ranges[s]) for s in stages])
     return xy, hunger, stages.tolist()
 
 
-def run_continuous(strategy, supply, seed=42, horizon=500, trace=False):
+def run_continuous(strategy, supply, seed=42, horizon=500, trace=False, environment="small"):
     if not isinstance(horizon, int) or horizon < 1:
         raise ValueError("Positive integer horizon required")
-    xy, hunger, stages = synthetic_colony(seed)
-    model = ContinuousModel(xy, hunger, stages, 12, 12, seed, strategy, supply=supply)
+    xy, hunger, stages = synthetic_colony(seed, environment)
+    count, workers, size = ENVIRONMENTS[environment]
+    scale = count / 36
+    started = time.perf_counter()
+    model = ContinuousModel(xy, hunger, stages, size, workers, seed, strategy, supply=supply, initial_stock=6*scale, supply_scale=scale)
     frames = [model.snapshot()] if trace else []
     mean_hunger, full_fraction, high_hunger = [], [], []
     for _ in range(horizon):
@@ -174,6 +201,9 @@ def run_continuous(strategy, supply, seed=42, horizon=500, trace=False):
         if trace:
             frames.append(model.snapshot())
     summary = {"strategy": strategy, "supply": supply, "seed": seed, "observed_steps": horizon,
+               "environment": environment, "n_larvae": count, "n_wasps": workers, "grid_size": size,
+               "runtime_seconds": time.perf_counter()-started,
+               "distance_per_larva": float(model.distance.sum()/count),
                "mean_hunger": float(np.mean(mean_hunger)), "mean_full_fraction": float(np.mean(full_fraction)),
                "high_hunger_fraction": float(np.mean(high_hunger)), "feeds": int(model.feed_counts.sum()),
                "refeeds": int(model.refeeds.sum()), "hunger_returns": int(model.hunger_returns.sum()),
@@ -184,25 +214,51 @@ def run_continuous(strategy, supply, seed=42, horizon=500, trace=False):
 
 
 def export():
+    # A single low-priority process leaves CPU capacity for the user's other task.
+    if os.name == "nt":
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        handle = ctypes.c_void_p(-1)
+        if not kernel.SetPriorityClass(handle, 0x4000):
+            raise OSError("Cannot set below-normal priority")
+        process_mask, system_mask = ctypes.c_size_t(), ctypes.c_size_t()
+        if not kernel.GetProcessAffinityMask(handle, ctypes.byref(process_mask), ctypes.byref(system_mask)) or not kernel.SetProcessAffinityMask(handle, ctypes.c_size_t(process_mask.value & -process_mask.value)):
+            raise OSError("Cannot limit campaign to one logical CPU")
     destination = Path(__file__).parent / "web/public/continuous"
     destination.mkdir(parents=True, exist_ok=True)
     source = Path(__file__).read_text(encoding="utf-8") + Path(__file__).with_name("research_model.py").read_text(encoding="utf-8")
     checksum = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    checkpoint = Path(__file__).parent / "outputs/scaling" / checksum
+    checkpoint.mkdir(parents=True, exist_ok=True)
     results, replays, deliveries = [], {}, {}
-    for supply in SUPPLIES:
-        replays[supply] = {}
+    for environment, (count, workers, size) in ENVIRONMENTS.items():
+      for supply in SUPPLIES:
+        scenario = f"{environment}-{supply}"
+        scale = count / 36
+        replays[scenario] = {}
         for strategy in STRATEGIES:
             for seed in range(42, 52):
-                model, summary, frames = run_continuous(strategy, supply, seed, trace=seed == 42)
+                saved = checkpoint / f"{scenario}-{strategy}-{seed}.json"
+                name = f"{supply}-{strategy}.json" if environment == "small" else f"{scenario}-{strategy}.json.gz"
+                replay = destination / name
+                if saved.exists() and (seed != 42 or replay.exists()):
+                    cached = json.loads(saved.read_text(encoding="utf-8"))
+                    if seed != 42 or cached.get("replay_sha256") == hashlib.sha256(replay.read_bytes()).hexdigest():
+                        results.append(cached["summary"])
+                        if seed == 42:
+                            replays[scenario][strategy] = name
+                            deliveries.setdefault(scenario, cached["deliveries"])
+                        continue
+                model, summary, frames = run_continuous(strategy, supply, seed, trace=seed == 42, environment=environment)
                 results.append(summary)
                 if frames:
-                    deliveries.setdefault(supply, [frame["delivery"] for frame in frames])
+                    deliveries.setdefault(scenario, [frame["delivery"] for frame in frames])
                     payload = {"schema_version": 3, "model_version": VERSION, "source_checksum": checksum,
-                               "scenario": supply, "strategy": strategy, "seed": seed, "grid_size": model.size,
+                               "scenario": scenario, "environment": environment, "strategy": strategy, "seed": seed, "grid_size": model.size,
                                "sensing_radius": 3, "communication_radius": 3, "claims_enabled": True,
                                "global_sensing": False, "satiation_threshold": SATIATION_THRESHOLD,
                                "hunger_growth": HUNGER_GROWTH, "feed_drop": FEED_DROP,
-                               "supply": list(SUPPLIES[supply]), "initial_stock": model.initial_stock,
+                               "supply": [SUPPLIES[supply][0], SUPPLIES[supply][1]*scale, SUPPLIES[supply][2]*scale], "initial_stock": model.initial_stock,
                                "capacity": model.capacity, "depot": model.depot.tolist(),
                                "larvae": [{"id": f"L{i+1:03}", "xy": p.tolist(), "stage": stages,
                                            "hunger": float(model.initial_hunger[i])}
@@ -210,14 +266,23 @@ def export():
                                "workers": [f"W{i+1:03}" for i in range(model.n_wasps)], "background_cells": [],
                                "frames": frames, "summary": {**summary, "finished": False,
                                    "completion_step": None, "replicate": seed - 42, "stop_reason": "fixed_horizon"}}
-                    name = f"{supply}-{strategy}.json"
-                    (destination / name).write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
-                    replays[supply][strategy] = name
+                    encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                    temporary = replay.with_suffix(replay.suffix + ".tmp")
+                    temporary.write_bytes(gzip.compress(encoded, compresslevel=6, mtime=0) if name.endswith(".gz") else encoded)
+                    temporary.replace(replay)
+                    replays[scenario][strategy] = name
+                saved.write_text(json.dumps({"summary": summary, "deliveries": deliveries.get(scenario) if seed == 42 else None,
+                                            "replay_sha256": hashlib.sha256(replay.read_bytes()).hexdigest() if seed == 42 else None}), encoding="utf-8")
+                print(f"{len(results)}/540 {scenario} {strategy} seed={seed}: {summary['runtime_seconds']:.2f}s", flush=True)
+                time.sleep(.1)
     report = {"model_version": VERSION, "source_checksum": checksum, "synthetic_only": True,
               "horizon": 500, "seeds": list(range(42, 52)), "replays": replays,
               "replay_deliveries": deliveries, "results": results}
-    (destination / "manifest.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f"Exported {len(results)} runs and 18 synthetic replays to {destination}")
+    report["environments"] = {key: {"larvae": v[0], "workers": v[1], "grid_size": v[2]} for key, v in ENVIRONMENTS.items()}
+    pending = destination / "manifest.json.tmp"
+    pending.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    pending.replace(destination / "manifest.json")
+    print(f"Exported {len(results)} runs and 54 synthetic replays to {destination}")
 
 
 if __name__ == "__main__":

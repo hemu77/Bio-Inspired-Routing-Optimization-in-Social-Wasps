@@ -49,7 +49,8 @@ class ContinuousFeedingTests(unittest.TestCase):
         _, a, frames_a = run_continuous("random", "scarce", horizon=60, trace=True)
         _, b, frames_b = run_continuous("tsp", "scarce", horizon=60, trace=True)
         self.assertEqual([f["delivery"] for f in frames_a], [f["delivery"] for f in frames_b])
-        self.assertEqual(run_continuous("random", "scarce", horizon=60)[1], a)
+        repeated = run_continuous("random", "scarce", horizon=60)[1]
+        self.assertEqual({k:v for k,v in repeated.items() if k != "runtime_seconds"}, {k:v for k,v in a.items() if k != "runtime_seconds"})
         self.assertEqual(a["food_delivered"], b["food_delivered"])
 
     def test_empty_worker_returns_and_refill_costs_an_action(self):
@@ -76,6 +77,30 @@ class ContinuousFeedingTests(unittest.TestCase):
         m.step()
         self.assertEqual(m.queues[0], [1, 0])
         self.assertEqual(m.target[0], 1)
+
+    def test_optimized_tour_matches_original_tie_break(self):
+        from research_model import ResearchModel
+        from continuous_model import synthetic_colony
+        for environment in ["small", "medium", "large"]:
+            xy,hunger,stages=synthetic_colony(42,environment)
+            size={"small":12,"medium":21,"large":36}[environment]
+            fast=ContinuousModel(xy,hunger,stages,size,1,42,"tsp")
+            original=ResearchModel(xy,hunger,stages,size,1,42,"tsp")
+            self.assertEqual(fast.choose_target(0),original.choose_target(0))
+            self.assertEqual(fast.queues[0],original.queues[0])
+
+    def test_scaled_resources_density_and_delivery_pairing(self):
+        from continuous_model import ENVIRONMENTS
+        baseline,_,base_frames=run_continuous("random","variable",horizon=30,trace=True)
+        for environment,(count,workers,size) in ENVIRONMENTS.items():
+            m,summary,frames=run_continuous("random","variable",horizon=30,trace=True,environment=environment)
+            self.assertEqual(len(m.larvae),count)
+            self.assertEqual(m.n_wasps,workers)
+            self.assertEqual(count/workers,3)
+            self.assertAlmostEqual(count/size**2,.25,delta=.006)
+            self.assertEqual(m.initial_stock,6*count/36)
+            np.testing.assert_allclose([f["delivery"] for f in frames],np.array([f["delivery"] for f in base_frames])*count/36)
+            self.assertEqual(summary["observed_steps"],30)
 
 
 if __name__ == "__main__":
