@@ -4,6 +4,52 @@ from continuous_model import ContinuousModel, run_continuous, SUPPLIES
 
 
 class ContinuousFeedingTests(unittest.TestCase):
+    def test_seed_export_rejects_incomplete_maps_and_wrong_identity(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import export_continuous_inputs as exporter
+        from continuous_model import ENVIRONMENTS, VERSION
+        from research_model import STRATEGIES
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'web/public/continuous';root.mkdir(parents=True)
+            manifest={'model_version':VERSION,'replays':{}}
+            (root/'manifest.json').write_text(json.dumps(manifest),encoding='utf-8')
+            with patch.object(exporter,'__file__',str(Path(temp)/'export_continuous_inputs.py')):
+                with self.assertRaisesRegex(ValueError,'nine scenarios'):
+                    exporter.export_inputs()
+                manifest['replays']={f'{env}-{supply}':{s:'trace.json' for s in STRATEGIES}
+                                     for env in ENVIRONMENTS for supply in SUPPLIES}
+                (root/'manifest.json').write_text(json.dumps(manifest),encoding='utf-8')
+                (root/'trace.json').write_text(json.dumps({'scenario':'wrong','strategy':'random','environment':'small','seed':43}),encoding='utf-8')
+                with self.assertRaisesRegex(ValueError,'identity mismatch'):
+                    exporter.export_inputs()
+
+    def test_individual_recovery_and_refill_requests_are_paired(self):
+        a,_,fa=run_continuous('random','abundant',horizon=30,trace=True)
+        b,_,fb=run_continuous('tsp','abundant',horizon=30,trace=True)
+        np.testing.assert_array_equal(a.growth,b.growth)
+        from research_model import HUNGER_GROWTH
+        ratios=a.growth/np.array([HUNGER_GROWTH[s] for s in a.stages])
+        self.assertTrue(np.all((ratios>=.75)&(ratios<=1.25)))
+        self.assertGreater(np.ptp(ratios),.1)
+        draws=[e['requested'] for f in fa for e in f['events'] if e['type']=='refill' and e['amount']>0]
+        self.assertGreater(len(set(draws)),1)
+        for worker in range(a.n_wasps):
+            sequences=[[e['requested'] for f in frames for e in f['events']
+                        if e['type']=='refill' and e['worker']==worker and e['amount']>0]
+                       for frames in (fa,fb)]
+            common=min(map(len,sequences))
+            self.assertEqual(sequences[0][:common],sequences[1][:common])
+        for frames in (fa,fb):
+            for f in frames:
+                for e in f['events']:
+                    if e['type']=='refill' and e['amount']>0:
+                        self.assertGreaterEqual(e['requested'],1.)
+                        self.assertLessEqual(e['requested'],2.)
+                        self.assertLessEqual(e['amount'],e['requested'])
+
     def test_full_larva_reopens_and_receives_another_feed(self):
         m = ContinuousModel([[0, 0]], [.2], ["L1"], 1, 1, 42, "random")
         m.loads[0] = 1.
@@ -20,7 +66,7 @@ class ContinuousFeedingTests(unittest.TestCase):
         m = ContinuousModel([[0, 0]], [.7], ["L3"], 1, 1, 42, "random")
         m.loads[0] = .1
         m.step()
-        self.assertAlmostEqual(m.hunger[0], .635)
+        self.assertAlmostEqual(m.hunger[0], .7+m.growth[0]-.1)
         self.assertAlmostEqual(m.consumed, .1)
         self.assertAlmostEqual(m.loads[0], 0.)
         self.assertEqual(m.satiated_at[0], -1)

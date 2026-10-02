@@ -136,6 +136,9 @@ main.comparing .layers, main.comparing .inspector { max-height: 360px; border-to
 progress { display: block; width: 100%; height: 9px; border: 0; margin: 14px 0 8px; accent-color: var(--active); }
 progress::-webkit-progress-bar { background: var(--track); border-radius: 4px; }
 progress::-webkit-progress-value { background: var(--active); border-radius: 4px; }
+#larva-hunger { accent-color: var(--warning); }
+#larva-hunger::-webkit-progress-value { background: var(--warning); }
+#larva-hunger::-moz-progress-bar { background: var(--warning); }
 #remaining { margin: 0; font-size: 14px; }
 .cycle-chart { margin-top: 22px; }
 .cycle-chart > span { font-size: 12px; color: var(--muted); }
@@ -176,6 +179,11 @@ footer select { padding: 5px; }
 .continuous-page .method-heading label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .continuous-page .method-heading select { width: 100%; min-width: 0; }
 .seed-range { color: var(--muted); }
+.selection-summary { flex-shrink: 0; margin: 0; padding: 8px 14px; font-size: 13px; line-height: 1.4; background: var(--panel); border-top: 1px solid var(--line); }
+.agent-inspector { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 20px; }
+.agent-inspector select { width: 100%; }
+.agent-inspector dd { font-family: inherit; font-size: 14px; }
+.agent-inspector button { margin: 4px 0; }
 @media (max-width: 900px) {
   .continuous-page button, .continuous-page select { min-height: 44px; }
   .continuous-page select { font-size: 16px; }

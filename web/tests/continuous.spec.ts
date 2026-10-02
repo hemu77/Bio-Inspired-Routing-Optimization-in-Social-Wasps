@@ -27,9 +27,11 @@ test('all synthetic replays conserve food and reconstruct renewable hunger',()=>
   }
   for(const methods of Object.values(manifest.replays) as Record<string,string>[]){
     let deliveries:number[]|undefined;
+    let recovery:number[]|undefined;
     expect(Object.keys(methods)).toHaveLength(6);
     for(const name of Object.values(methods)){
       const trace=validateContinuous(read(name),manifest);
+      if(recovery)expect(trace.individual_growth).toEqual(recovery);else recovery=trace.individual_growth;
       expect(()=>validateContinuous(trace,{...manifest,environments:{}})).toThrow();
       const arrivals=trace.frames.map(f=>f.delivery);
       if(deliveries)expect(arrivals).toEqual(deliveries);else deliveries=arrivals;
@@ -39,10 +41,19 @@ test('all synthetic replays conserve food and reconstruct renewable hunger',()=>
       expect(trace.frames.at(-1)!.refeeds).toBeGreaterThan(0);
       const corrupt=structuredClone(trace);corrupt.frames[2].worker_loads[0]+=.01;
       expect(()=>validateContinuous(corrupt,manifest)).toThrow();
-      const supply=structuredClone(trace);supply.supply[0]=1;
-      expect(()=>validateContinuous(supply,manifest)).toThrow();
-      const arrival=structuredClone(trace);arrival.frames[1].delivery=999;
-      expect(()=>validateContinuous(arrival,manifest)).toThrow();
+      corrupt.frames[2].worker_loads[0]=trace.frames[2].worker_loads[0];
+      corrupt.supply[0]=1;
+      expect(()=>validateContinuous(corrupt,manifest)).toThrow();
+      corrupt.supply[0]=trace.supply[0];
+      corrupt.frames[1].delivery=999;
+      expect(()=>validateContinuous(corrupt,manifest)).toThrow();
+      corrupt.frames[1].delivery=trace.frames[1].delivery;
+      corrupt.individual_growth[0]*=1.01;
+      expect(()=>validateContinuous(corrupt,manifest)).toThrow();
+      corrupt.individual_growth[0]=trace.individual_growth[0];
+      const event=corrupt.frames.flatMap(f=>f.events).find(e=>e.type==='refill'&&Number(e.amount)>0)!;
+      event.requested=event.requested===1.5?1.6:1.5;
+      expect(()=>validateContinuous(corrupt,manifest)).toThrow();
     }
   }
 });
@@ -54,6 +65,16 @@ test('continuous viewer shows hunger returning, refeeding, supply comparison and
   await expect(page.locator('#comparison tr')).toHaveCount(6);
   await expect(page.locator('#current-count')).toContainText('324 full now / 108 workers');
   await expect(page.locator('#hunger-path')).toHaveAttribute('d',/^M25,/);
+  await expect(page.locator('#larva-rate')).toContainText('hunger / tick');
+  await page.locator('#worker').selectOption('1');
+  await page.locator('#pickup-event').click();
+  await expect(page.locator('#worker-pickup')).toContainText('Requested');
+  await expect(page.locator('#selection-summary')).toContainText('W002');
+  await page.locator('#larva').selectOption('1');
+  await expect(page.locator('#selection-summary')).toContainText('L002');
+  await page.locator('#larva-feed-event').click();
+  await expect(page.locator('#larva-last-feed')).toContainText('Hunger');
+  await page.locator('.layers').screenshot({path:'test-results/continuous-agent-inspector.png'});
   for(const size of ['small','medium','large']){
     await page.locator('#environment').selectOption(size);
     await expect(page.locator('#status')).toBeHidden();
@@ -137,6 +158,9 @@ test.describe('continuous mobile layout',()=>{
     expect(clipped).toBe(false);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.locator('.continuous-results').screenshot({path:`test-results/mobile-${width}-results.png`});
+    await page.locator('#larva-feed-event').tap();
+    await expect(page.locator('#larva-last-feed')).toContainText('Hunger');
+    await page.locator('.layers').screenshot({path:`test-results/mobile-${width}-inspector.png`});
     expect(errors).toEqual([]);
   });
 });

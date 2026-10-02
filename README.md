@@ -21,6 +21,11 @@ A separate, fully synthetic experiment adds returning hunger and finite food.
 Full larvae can become hungry again. Workers carry at most two assumed food
 units, return to a depot when empty, and may give only a partial portion.
 External deliveries arrive unpredictably; no worker knows future arrivals.
+Each larva also has its own fixed recovery rate (75-125% of its stage baseline).
+Each nonempty pickup requests a random 50-100% of worker capacity, capped by
+available stock. These are seeded assumptions, not measured food masses.
+Tap an agent or choose its ID to inspect recovery, current food, last-feed
+amounts and stock-limited pickups; jump directly to its next recorded event.
 The contrasting depot ring identifies where workers collect food. Foragers and their
 trips are not individually simulated.
 
@@ -45,9 +50,9 @@ observation window replaces the permanent-completion endpoint.
 
 | Small colony: mean hunger across ten seeds; lower is better | Scarce | Variable | Abundant |
 |---|---:|---:|---:|
-| TSP (nearest-neighbour tour) | 0.891 | 0.469 | 0.424 |
-| Random | 0.894 | 0.614 | 0.601 |
-| Local urgency + claims | 0.901 | 0.512 | 0.457 |
+| TSP (nearest-neighbour tour) | 0.891 | 0.498 | 0.478 |
+| Random | 0.893 | 0.643 | 0.635 |
+| Local urgency + claims | 0.903 | 0.548 | 0.527 |
 
 These are descriptive results for the stated synthetic assumptions, not fitted
 biological predictions. Low supply limits all policies; additional supply does

@@ -7,6 +7,11 @@ real wasps use these policies or physiological rates.
 
 ## What Changes
 
+The current release is `continuous-synthetic-v2`. It adds bounded individual
+recovery variation and random requested pickup sizes to v1. These distributions
+are disclosed assumptions, not fitted physiological measurements. The original
+one-round research-v3 experiment remains unchanged.
+
 Hunger grows for every larva each tick, including those currently full. A full
 larva becomes eligible for feeding again when hunger exceeds 0.12. A feed lowers
 hunger by the minimum of the stage portion, remaining hunger and carried food.
@@ -18,7 +23,10 @@ workers return to a central depot. Refilling costs one action; travelling,
 feeding and broadcasting also cost one action. Workers do not obtain food
 remotely or feed while moving. Food is conserved between the depot, carried
 loads and delivered feed portions. A partly loaded worker leaves immediately;
-this refill policy is an assumption shared by all routing methods.
+this refill policy is an assumption shared by all routing methods. At each
+nonempty pickup, the worker requests a uniform 50-100% of its capacity. Actual
+food received is the smaller of that request and the depot stock; no food is
+created by the random draw. Empty-depot waiting consumes no pickup draw.
 
 TSP keeps its current visit order and appends reopened larvae to the end of any
 active tour. This prevents renewed demand from disappearing while retaining
@@ -38,7 +46,9 @@ fixed location. Future deliveries are unavailable to routing decisions.
 | Medium: larvae / feeding workers / grid | 108 / 36 / 21 x 21 |
 | Large: larvae / feeding workers / grid | 324 / 108 / 36 x 36 |
 | Initial stage hunger | L1 U[0.20,0.50]; L2 U[0.45,0.75]; L3 U[0.65,1.00] |
-| Hunger growth per tick | L1 0.020; L2 0.028; L3 0.035 |
+| Baseline hunger growth per tick | L1 0.020; L2 0.028; L3 0.035 |
+| Individual growth | Baseline x U[0.75,1.25], drawn once per larva |
+| Requested food per nonempty pickup | Capacity x U[0.50,1.00] |
 | Maximum portion per feed | L1 0.35; L2 0.45; L3 0.55 |
 | Full now | Hunger <= 0.12 |
 | Worker capacity | 2 food units at every size |
@@ -64,6 +74,26 @@ All supplies are stochastic. The labels describe these input distributions;
 own independent geometry and starting hunger. Geometry, hunger and delivery
 streams are paired across policies for each seed and supply. Delivery RNG is
 separate from policy decisions, so route choices cannot alter arrivals.
+Individual recovery has another independent random stream. Each worker has its
+own pickup stream: its kth nonempty pickup has the same requested amount across
+policies, although pickup times and stock-limited actual amounts can differ.
+The individual rate stays fixed during a run; this is heterogeneity between
+larvae, not a new physiological noise draw each tick.
+
+## Reading Individual States
+
+Tap a larva or worker, or select its ID. The ring highlights that agent, and a
+short current-state readout stays below the nest. The larval inspector shows
+remaining hunger, stage, recovery per tick, last feed amount, feeding worker,
+and hunger before/after the feed. The no-feed countdown is conditional on no
+intervening feeding; it is not a prediction of the next observed feeding event.
+
+The worker inspector shows carried food against capacity, current action and
+target, and requested versus actual food at its last nonempty pickup. A shortage
+is labeled explicitly. Jump buttons show the selected larva's next feed or the
+selected worker's next pickup, without inventing events beyond the saved window.
+Food units and ticks remain dimensionless. The view does not measure grams,
+seconds or physiological fullness.
 
 ## What Scaling Tests
 
@@ -113,12 +143,12 @@ Mean hunger under **variable supply**, averaged over seeds 42-51:
 
 | Policy | Small: 36 larvae | Medium: 108 larvae | Large: 324 larvae |
 |---|---:|---:|---:|
-| Random | 0.614 | 0.724 | 0.818 |
-| Biased / persistent walk | 0.703 | 0.689 | 0.718 |
-| Greedy / global weighted choice | 0.631 | 0.792 | 0.882 |
-| TSP / nearest-neighbor tour | 0.469 | 0.604 | 0.743 |
-| Local nearest | 0.455 | 0.638 | 0.762 |
-| Local urgency + claims | 0.512 | 0.611 | 0.741 |
+| Random | 0.643 | 0.747 | 0.837 |
+| Biased / persistent walk | 0.725 | 0.718 | 0.748 |
+| Greedy / global weighted choice | 0.664 | 0.814 | 0.892 |
+| TSP / nearest-neighbor tour | 0.498 | 0.639 | 0.766 |
+| Local nearest | 0.492 | 0.669 | 0.778 |
+| Local urgency + claims | 0.548 | 0.657 | 0.770 |
 
 The lowest descriptive mean changes from local nearest (small), to TSP (medium),
 to biased walking (large). This is evidence against claiming one universal
@@ -135,6 +165,7 @@ Run from the repository root:
 ```bash
 python -m unittest test_research_model test_continuous_model -v
 python continuous_model.py
+python export_continuous_inputs.py
 cd web
 npm ci
 npm test
@@ -148,6 +179,9 @@ research-v3 results. The manifest fingerprints both engine source files.
 Browser validation independently reconstructs hunger transitions, feed portions,
 refills, food conservation, movement budgets and scheduler ordering. Tests
 reject fabricated food and check all exported replays before publication.
+The second export command independently reconstructs seed-42 recovery and pickup
+streams, verifies them against every replay, and records their expected values
+in the manifest. Browser checks reject even within-range changes to those inputs.
 
 Runs are sequential. On Windows the exporter requests below-normal priority
 and one logical CPU, leaving capacity for other work. Source-keyed checkpoints

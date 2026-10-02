@@ -15,7 +15,7 @@ import numpy as np
 from research_model import ResearchModel, STRATEGIES, MOVES, SATIATION_THRESHOLD, HUNGER_GROWTH, FEED_DROP
 
 SUPPLIES = {"scarce": (.08, 1., 3.), "variable": (.20, 2., 6.), "abundant": (.40, 3., 7.)}
-VERSION = "continuous-synthetic-v1"
+VERSION = "continuous-synthetic-v2"
 ENVIRONMENTS = {"small": (36, 12, 12), "medium": (108, 36, 21), "large": (324, 108, 36)}
 
 
@@ -33,6 +33,12 @@ class ContinuousModel(ResearchModel):
         self.depot = np.array([self.size // 2] * 2)
         # A separate stream pairs deliveries across policies regardless of their actions.
         self.delivery_rng = np.random.default_rng(np.random.SeedSequence([self.seed, 9821]))
+        # Fixed individual variation; independent of policy choices and arrivals.
+        recovery_rng = np.random.default_rng(np.random.SeedSequence([self.seed, 9833]))
+        self.growth = self.growth * recovery_rng.uniform(.75, 1.25, len(self.larvae))
+        # Pair each worker's kth nonempty pickup across policies, not its timing.
+        self.refill_rngs = [np.random.default_rng(np.random.SeedSequence([self.seed, 9834, w]))
+                            for w in range(self.n_wasps)]
         self.hunger_returns = np.zeros(len(self.larvae), dtype=int)
         self.refeeds = np.zeros(len(self.larvae), dtype=int)
         self.ever_full = self.hunger <= SATIATION_THRESHOLD
@@ -105,10 +111,11 @@ class ContinuousModel(ResearchModel):
             if self.loads[worker] <= 1e-12:
                 self.target[worker] = -1
                 if np.array_equal(pos, self.depot):
-                    amount = min(self.capacity, self.stock)
+                    requested = float(self.refill_rngs[worker].uniform(.5, 1.)) * self.capacity if self.stock > 0 else 0.
+                    amount = min(requested, self.stock)
                     self.stock -= amount
                     self.loads[worker] = amount
-                    self.events.append({"type": "refill", "worker": worker, "amount": amount})
+                    self.events.append({"type": "refill", "worker": worker, "amount": amount, "requested": requested})
                     self.reason[worker] = "refill at depot" if amount > 0 else "depot empty; waiting"
                     self.empty_waits += amount == 0
                 else:
@@ -258,6 +265,8 @@ def export():
                                "sensing_radius": 3, "communication_radius": 3, "claims_enabled": True,
                                "global_sensing": False, "satiation_threshold": SATIATION_THRESHOLD,
                                "hunger_growth": HUNGER_GROWTH, "feed_drop": FEED_DROP,
+                               "individual_growth": model.growth.tolist(),
+                               "growth_multiplier_range": [.75, 1.25], "refill_fraction_range": [.5, 1.],
                                "supply": [SUPPLIES[supply][0], SUPPLIES[supply][1]*scale, SUPPLIES[supply][2]*scale], "initial_stock": model.initial_stock,
                                "capacity": model.capacity, "depot": model.depot.tolist(),
                                "larvae": [{"id": f"L{i+1:03}", "xy": p.tolist(), "stage": stages,
@@ -271,8 +280,10 @@ def export():
                     temporary.write_bytes(gzip.compress(encoded, compresslevel=6, mtime=0) if name.endswith(".gz") else encoded)
                     temporary.replace(replay)
                     replays[scenario][strategy] = name
-                saved.write_text(json.dumps({"summary": summary, "deliveries": deliveries.get(scenario) if seed == 42 else None,
+                pending_checkpoint = saved.with_suffix('.tmp')
+                pending_checkpoint.write_text(json.dumps({"summary": summary, "deliveries": deliveries.get(scenario) if seed == 42 else None,
                                             "replay_sha256": hashlib.sha256(replay.read_bytes()).hexdigest() if seed == 42 else None}), encoding="utf-8")
+                pending_checkpoint.replace(saved)
                 print(f"{len(results)}/540 {scenario} {strategy} seed={seed}: {summary['runtime_seconds']:.2f}s", flush=True)
                 time.sleep(.1)
     report = {"model_version": VERSION, "source_checksum": checksum, "synthetic_only": True,
