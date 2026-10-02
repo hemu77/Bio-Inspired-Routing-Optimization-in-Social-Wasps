@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python -m unittest test_research_model test_continuous_model -v
+      - run: python -m unittest test_research_model test_continuous_model test_biological_evidence -v
       - run: python validate_research.py
       - run: python export_viewer_context.py
       - run: python execute_research_notebook.py

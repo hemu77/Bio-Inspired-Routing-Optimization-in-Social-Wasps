@@ -105,3 +105,38 @@ test('continuous viewer rejects fabricated food',async({page})=>{
   await expect(page.locator('#status')).toContainText('Invalid');
   await expect(page.locator('#play')).toBeDisabled();
 });
+
+test.describe('continuous mobile layout',()=>{
+  test.use({hasTouch:true});
+  for(const width of [320,390,768])test(`readable controls and results at ${width}px`,async({page})=>{
+    const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.setViewportSize({width,height:844});
+    await page.goto('/continuous.html');
+    await expect(page.locator('#status')).toBeHidden();
+    await page.locator('#strategy').selectOption('local_urgency_claims');
+    await expect(page.locator('#status')).toBeHidden();
+    for(const id of ['play','environment','supply','strategy','zoom-in','zoom-out','reset','theme-toggle']){
+      const box=(await page.locator(`#${id}`).boundingBox())!;
+      expect(box.height,`${id} touch target`).toBeGreaterThanOrEqual(44);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x+box.width).toBeLessThanOrEqual(width);
+    }
+    const header=(await page.locator('.view-label').boundingBox())!;
+    const count=(await page.locator('#current-count').boundingBox())!;
+    expect(count.y+count.height).toBeLessThanOrEqual(header.y+58);
+    await page.locator('#play').tap();
+    await expect(page.locator('#tick')).not.toHaveText('0 / 500');
+    await page.locator('#play').tap();
+    await page.locator('#zoom-in').tap();
+    await page.locator('#reset').tap();
+    await page.locator('.viewport').screenshot({path:`test-results/mobile-${width}-dark.png`});
+    await page.locator('#theme-toggle').tap();
+    await page.locator('.viewport').screenshot({path:`test-results/mobile-${width}-light.png`});
+    await expect(page.locator('#comparison .seed-range')).toHaveCount(18);
+    const clipped=await page.locator('#comparison td').evaluateAll(cells=>cells.some(c=>c.scrollWidth>c.clientWidth));
+    expect(clipped).toBe(false);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.locator('.continuous-results').screenshot({path:`test-results/mobile-${width}-results.png`});
+    expect(errors).toEqual([]);
+  });
+});

@@ -4,6 +4,7 @@ import { ReplayScene } from './scene';
 import { labels } from './trace';
 import { ContinuousManifest, ContinuousTrace, validateContinuous } from './continuous-trace';
 
+document.body.classList.add('continuous-page');
 document.querySelector('#app')!.innerHTML = `
 <header><div><h1>Feeding, again</h1><p class="subtitle">Returning hunger. Finite food. Repeated visits.</p></div><nav><a href="./">One-round experiment</a><button id="theme-toggle">Light mode</button></nav></header>
 <section class="method-bar"><p class="model-note">Synthetic scaling study. Nest, food units, arrival rates and hunger growth are assumptions, not measured biology. Each run covers 500 ticks.</p><div class="method-heading"><label>Colony size <select id="environment"><option value="small">Small: 36 larvae / 12 workers</option><option value="medium">Medium: 108 larvae / 36 workers</option><option value="large" selected>Large: 324 larvae / 108 workers</option></select></label><label>Food supply <select id="supply"><option>scarce</option><option selected>variable</option><option>abundant</option></select></label><label>Routing method <select id="strategy"></select></label></div><p id="supply-note"></p></section>
@@ -113,7 +114,10 @@ function comparison(){
       if(runs.length!==10||runs.some(r=>!Number.isFinite(r.mean_hunger)))throw Error('Invalid comparison results');
       const values=runs.map(r=>metric==='empty_waits'?r.empty_waits/(r.n_wasps*500):Number(r[metric as keyof typeof r]));
       if(values.some(v=>!Number.isFinite(v)))throw Error('Invalid comparison metric');
-      const cell=document.createElement('td');cell.textContent=`${(values.reduce((a,b)=>a+b,0)/10).toFixed(3)} (${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)})`;row.append(cell);
+      const cell=document.createElement('td');cell.dataset.label=`${size[0].toUpperCase()+size.slice(1)}: ${runs[0].n_larvae}`;
+      const mean=document.createElement('span');mean.textContent=(values.reduce((a,b)=>a+b,0)/10).toFixed(3);
+      const range=document.createElement('span');range.className='seed-range';range.textContent=`(${Math.min(...values).toFixed(3)}–${Math.max(...values).toFixed(3)})`;
+      cell.append(mean,document.createTextNode(' '),range);row.append(cell);
     }$('comparison').append(row);
   }
 }

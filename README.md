@@ -11,6 +11,10 @@ A dataset-grounded agent experiment: how do searching workers finish feeding a c
 
 ## Continuous Feeding: Hunger Returns
 
+**Biological validation is a separate, unfinished requirement.** See the
+[evidence audit and measurement protocol](docs/BIOLOGICAL_VALIDATION.md).
+Event timestamps cannot substitute for measured hunger recovery or food loads.
+
 **[Open the continuous experiment](https://hemu77.github.io/Bio-Inspired-Routing-Optimization-in-Social-Wasps/continuous.html)**
 
 A separate, fully synthetic experiment adds returning hunger and finite food.
